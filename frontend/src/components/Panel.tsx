@@ -1,5 +1,6 @@
 import React from 'react';
 
+// Note: The Panel component supports the `children` prop via React.PropsWithChildren.
 type PanelProps = {
   title: string;
 };
