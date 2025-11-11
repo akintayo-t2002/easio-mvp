@@ -1,30 +1,36 @@
-import { useState } from "react"
-import { Plus, Zap, Clock } from "lucide-react"
-import { Button } from "./ui/button"
-import LoadingSpinner from "./LoadingSpinner"
-import type { WorkflowSummary } from "../types/workflow"
+import React, { useState } from 'react';
+import { Plus, Zap, Clock } from 'lucide-react';
+import { Button } from './ui/button';
+import LoadingSpinner from './LoadingSpinner';
+import type { WorkflowSummary } from '../types/workflow';
 
 interface WorkflowsListProps {
-  onCreateWorkflow: () => void
-  onSelectWorkflow: (workflow: WorkflowSummary) => void
-  workflows?: WorkflowSummary[]
-  isLoading?: boolean
-  isCreating?: boolean
+  onCreateWorkflow: () => void;
+  onSelectWorkflow: (workflow: WorkflowSummary) => void;
+  workflows?: WorkflowSummary[];
+  isLoading?: boolean;
+  isCreating?: boolean;
 }
 
-export default function WorkflowsList({ onCreateWorkflow, onSelectWorkflow, workflows = [], isLoading = false, isCreating = false }: WorkflowsListProps) {
-  const [hoveredId, setHoveredId] = useState<string | null>(null)
+const WorkflowsList: React.FC<WorkflowsListProps> = ({
+  onCreateWorkflow,
+  onSelectWorkflow,
+  workflows = [],
+  isLoading = false,
+  isCreating = false,
+}) => {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-  const hasWorkflows = workflows.length > 0
+  const hasWorkflows = workflows.length > 0;
 
   return (
     <div className="workflow-fade-enter flex-1 flex flex-col bg-white relative">
       {/* Loading Overlay */}
       {(isLoading || isCreating) && (
         <div className="absolute inset-0 bg-white bg-opacity-90 z-50 flex items-center justify-center">
-          <LoadingSpinner 
-            message={isCreating ? "Creating workflow..." : "Loading workflows..."} 
-            size="lg" 
+          <LoadingSpinner
+            message={isCreating ? 'Creating workflow...' : 'Loading workflows...'}
+            size="lg"
           />
         </div>
       )}
@@ -84,20 +90,20 @@ export default function WorkflowsList({ onCreateWorkflow, onSelectWorkflow, work
                   <div
                     className={`h-full border border-workflow-card-border rounded-lg p-6 transition-all duration-200 ${
                       hoveredId === workflow.id
-                        ? "bg-workflow-card-hover shadow-lg border-accent"
-                        : "bg-workflow-card-bg hover:shadow-md"
+                        ? 'bg-workflow-card-hover shadow-lg border-accent'
+                        : 'bg-workflow-card-bg hover:shadow-md'
                     }`}
                   >
                     {/* Status Badge */}
                     <div className="flex items-center justify-between mb-4">
                       <span
                         className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                          workflow.status === "published"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-yellow-100 text-yellow-800"
+                          workflow.status === 'published'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-yellow-100 text-yellow-800'
                         }`}
                       >
-                        {workflow.status === "published" ? "Published" : "Draft"}
+                        {workflow.status === 'published' ? 'Published' : 'Draft'}
                       </span>
                     </div>
 
@@ -108,7 +114,7 @@ export default function WorkflowsList({ onCreateWorkflow, onSelectWorkflow, work
 
                     {/* Description */}
                     <p className="text-text-secondary text-sm mb-4 line-clamp-2">
-                      {workflow.description || "No description provided"}
+                      {workflow.description || 'No description provided'}
                     </p>
 
                     {/* Metadata */}
@@ -135,14 +141,7 @@ export default function WorkflowsList({ onCreateWorkflow, onSelectWorkflow, work
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-
-
-
-
-
-
-
-
+export default WorkflowsList;

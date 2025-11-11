@@ -1,20 +1,18 @@
-import { Handle, Position, NodeProps } from '@xyflow/react'
-import StartNode from '../start-node'
+import { Handle, Position, NodeProps } from '@xyflow/react';
+import StartNode from '../start-node';
+import React from 'react';
 
-export function StartNodeWrapper({ data, selected }: NodeProps) {
-  return (
-    <>
-      <StartNode data={data} selected={selected} />
-      <Handle type="source" position={Position.Right} />
-    </>
-  )
-}
-
-
-
-
-
-
-
-
-
+export const StartNodeWrapper: React.FC<NodeProps> = ({ data, selected }) => {
+	return (
+		<>
+			<StartNode
+				data={data}
+				selected={selected}
+			/>
+			<Handle
+				type="source"
+				position={Position.Right}
+			/>
+		</>
+	);
+};

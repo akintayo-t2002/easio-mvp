@@ -9,30 +9,20 @@ type TextAreaFieldProps = TextFieldProps & {
   multiline?: boolean;
 };
 
-export function TextField({ label, value }: TextFieldProps): React.JSX.Element {
+export const TextField: React.FC<TextFieldProps> = ({ label, value }) => {
   return (
     <div>
       <label>{label}</label>
       <input value={value} readOnly />
     </div>
   );
-}
+};
 
-export function TextAreaField({ label, value }: TextAreaFieldProps): React.JSX.Element {
+export const TextAreaField: React.FC<TextAreaFieldProps> = ({ label, value }) => {
   return (
     <div>
       <label>{label}</label>
       <textarea value={value} readOnly />
     </div>
   );
-}
-
-
-
-
-
-
-
-
-
-
+};
