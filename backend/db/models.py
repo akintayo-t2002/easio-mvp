@@ -120,6 +120,17 @@ class IntegrationConnection(BaseModel):
     profile_email: Optional[str] = None
 
 
+class OAuthStateToken(BaseModel):
+    nonce: str
+    provider: str
+    organization_id: UUID
+    redirect_url: Optional[str] = None
+    origin: Optional[str] = None
+    pkce_verifier: str
+    expires_at: datetime
+    created_at: datetime
+
+
 
 
 

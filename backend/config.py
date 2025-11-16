@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(default="")
     next_public_livekit_url: str = Field(default="")
     frontend_base_url: str = Field(default="http://localhost:5173")
+    frontend_allowed_origins: list[str] = Field(default_factory=list)
+    frontend_redirect_path_prefixes: list[str] = Field(default_factory=list)
     airtable_client_id: str = Field(default="")
     airtable_client_secret: str = Field(default="")
     airtable_redirect_uri: str = Field(default="")
@@ -25,6 +27,7 @@ class Settings(BaseSettings):
     gmail_client_secret: str = Field(default="")
     gmail_redirect_uri: str = Field(default="")
     oauth_state_secret: str = Field(default="")
+    oauth_state_ttl_seconds: int = Field(default=300)
     spitch_api_key: str |None=None
     eleven_api_key: str |None=None
 

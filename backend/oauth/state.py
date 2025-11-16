@@ -32,6 +32,7 @@ def generate_state_token(
     redirect_url: Optional[str] = None,
     ttl_seconds: int = 300,
     extra: Optional[Dict[str, Any]] = None,
+    nonce_value: Optional[str] = None,
 ) -> str:
     """Create a signed state token embedding the organization and redirect info."""
 
@@ -41,7 +42,7 @@ def generate_state_token(
     payload: Dict[str, Any] = {
         "org": str(organization_id),
         "exp": int(time.time()) + ttl_seconds,
-        "nonce": secrets.token_urlsafe(8),
+        "nonce": nonce_value or secrets.token_urlsafe(8),
     }
     if redirect_url:
         payload["redirect"] = redirect_url

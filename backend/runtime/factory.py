@@ -23,7 +23,6 @@ class UserData:
     """Stores data and agents to be shared across the session."""
 
     personas: dict[str, Agent] = field(default_factory=dict)
-    prev_agent: Optional[Agent] = None
     ctx: Optional[JobContext] = None
     workflow_config: Optional[WorkflowRuntimeConfig] = None
 
@@ -67,18 +66,8 @@ class BaseConfigurableAgent(Agent):
                     exc,
                 )
 
-        chat_ctx = self.chat_ctx.copy()
+        chat_ctx = self.session.history.copy()
 
-        # Merge context from previous agent if exists
-        if userdata.prev_agent:
-            items_copy = self._truncate_chat_ctx(
-                userdata.prev_agent.chat_ctx.items, keep_function_call=True
-            )
-            existing_ids = {item.id for item in chat_ctx.items}
-            items_copy = [item for item in items_copy if item.id not in existing_ids]
-            chat_ctx.items.extend(items_copy)
-
-        # Add system message identifying this agent
         chat_ctx.add_message(
             role="system",
             content=f"You are now {self.agent_name}. Continue the conversation naturally.",
@@ -86,50 +75,17 @@ class BaseConfigurableAgent(Agent):
         await self.update_chat_ctx(chat_ctx)
         self.session.generate_reply()
 
-    def _truncate_chat_ctx(
-        self,
-        items: list,
-        keep_last_n_messages: int = 6,
-        keep_system_message: bool = False,
-        keep_function_call: bool = False,
-    ) -> list:
-        """Truncate chat context to keep only recent messages."""
-
-        def _valid_item(item: Any) -> bool:
-            if not keep_system_message and item.type == "message" and item.role == "system":
-                return False
-            if not keep_function_call and item.type in [
-                "function_call",
-                "function_call_output",
-            ]:
-                return False
-            return True
-
-        new_items = []
-        for item in reversed(items):
-            if _valid_item(item):
-                new_items.append(item)
-            if len(new_items) >= keep_last_n_messages:
-                break
-        new_items = new_items[::-1]
-
-        # Remove leading function calls
-        while new_items and new_items[0].type in ["function_call", "function_call_output"]:
-            new_items.pop(0)
-
-        return new_items
-
     async def _transfer_to_agent(self, target_agent_id: str, context: RunContext_T) -> Agent:
         """Transfer to another agent while preserving context."""
         userdata = context.userdata
-        current_agent = context.session.current_agent
         next_agent = userdata.personas.get(target_agent_id)
 
         if not next_agent:
             logger.error(f"Target agent {target_agent_id} not found")
             raise ValueError(f"Agent {target_agent_id} not found")
 
-        userdata.prev_agent = current_agent
+        chat_ctx = self.session.history.copy()
+        await next_agent.update_chat_ctx(chat_ctx)
         return next_agent
 
 
@@ -252,42 +208,44 @@ class AgentFactory:
 
     def _create_stt(self, config: Optional[dict[str, Any]]) -> Any:
         """Create STT provider from configuration."""
-        if not config:
-            return assemblyai.STT()
 
-        provider = config.get("provider", "assemblyai")
-        use_livekit = config.get("use_livekit", False)
+        config = config or {}
+        provider = (config.get("provider") or "deepgram").lower()
+        use_livekit = bool(config.get("use_livekit", False))
+
+        if provider == "deepgram":
+            model = config.get("model") or "nova-3"
+            if use_livekit:
+                return f"deepgram/{model}"
+            return deepgram.STT(model=model)
 
         if provider == "assemblyai":
-            # AssemblyAI STT doesn't accept model parameter
             if use_livekit:
                 model = config.get("model", "best")
                 return f"assemblyai/{model}"
             return assemblyai.STT()
 
-        if provider == "deepgram":
-            model = config.get("model", "nova-2")
-            if use_livekit:
-                return f"deepgram/{model}"
-            return deepgram.STT(model=model)
-
-        return assemblyai.STT()
+        logger.warning("Unknown STT provider '%s'; defaulting to Deepgram nova-3", provider)
+        return deepgram.STT(model="nova-3")
 
     def _create_llm(self, config: Optional[dict[str, Any]]) -> Any:
         """Create LLM provider from configuration."""
+
         if not config:
+            logger.info("LLM config missing; defaulting to OpenAI gpt-4o-mini")
             return openai.LLM(model="gpt-4o-mini")
 
-        provider = config.get("provider", "openai")
-        model = config.get("model", "gpt-4o-mini")
-        use_livekit = config.get("use_livekit", False)
+        provider = (config.get("provider") or "openai").lower()
+        model = config.get("model") or "gpt-4o-mini"
+        use_livekit = bool(config.get("use_livekit", False))
 
         if provider == "openai":
             if use_livekit:
                 return f"openai/{model}"
             return openai.LLM(model=model)
 
-        return openai.LLM(model="gpt-4o-mini")
+        logger.warning("Unsupported LLM provider '%s'; defaulting to OpenAI", provider)
+        return openai.LLM(model=model)
 
     def _create_tts(self, config: Optional[dict[str, Any]]) -> Any:
         """Create TTS provider from configuration."""

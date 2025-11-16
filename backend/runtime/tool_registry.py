@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from email.utils import getaddresses
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence
 from urllib.parse import quote
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import aiohttp
 from livekit.agents.llm.tool_context import ToolError, function_tool
@@ -24,11 +24,14 @@ from ..services.gmail import (
     send_email as gmail_send_email,
 )
 from ..services.gmail_oauth import GmailOAuthError, fetch_userinfo
+from ..services.integration_secrets import (
+    IntegrationSecretError,
+    persist_access_token_secret,
+    persist_refresh_token_secret,
+)
 from ..services.vault import (
     VaultError,
-    create_secret,
     get_secret,
-    update_secret,
 )
 from .config import RuntimeToolParameterConfig, ToolConfig, WorkflowRuntimeConfig
 
@@ -185,104 +188,6 @@ async def _load_secret(secret_id: Optional[UUID]) -> Optional[str]:
         raise ToolError("Unable to load Airtable credentials.") from exc
 
 
-async def _store_access_token(
-    *,
-    organization_id: UUID,
-    repo: IntegrationConnectionRepository,
-    connection: Any,
-    access_token: str,
-    expires_at: Optional[datetime],
-    provider: str,
-) -> str:
-    settings = get_settings()
-    secret_id = getattr(connection, "access_token_secret_id", None)
-    created_at: datetime | None = None
-
-    if secret_id:
-        try:
-            _, created_at = await update_secret(
-                settings, secret_id=str(secret_id), secret=access_token
-            )
-        except VaultError as exc:
-            logger.warning("Failed to update Airtable access token secret: %s", exc)
-            raise ToolError("Unable to update Airtable credentials.") from exc
-        access_secret_id = str(secret_id)
-    else:
-        slug = provider.replace(".", "-")
-        secret_name = f"{slug}-access-{organization_id}-{uuid4()}"
-        description = f"{provider.capitalize()} access token for org {organization_id}"
-        try:
-            access_secret_id, created_at = await create_secret(
-                settings,
-                name=secret_name,
-                secret=access_token,
-                description=description,
-            )
-        except VaultError as exc:
-            logger.warning("Failed to store Airtable access token: %s", exc)
-            raise ToolError("Unable to persist Airtable credentials.") from exc
-
-    await _run_in_thread(
-        repo.upsert_connection,
-        organization_id,
-        provider,
-        access_token=None,
-        refresh_token=None,
-        access_token_secret_id=access_secret_id,
-        access_token_secret_created_at=created_at,
-        expires_at=expires_at,
-    )
-    return access_secret_id
-
-
-async def _store_refresh_token(
-    *,
-    organization_id: UUID,
-    repo: IntegrationConnectionRepository,
-    connection: Any,
-    refresh_token: str,
-    provider: str,
-) -> str:
-    settings = get_settings()
-    secret_id = getattr(connection, "refresh_token_secret_id", None)
-    created_at: datetime | None = None
-
-    if secret_id:
-        try:
-            _, created_at = await update_secret(
-                settings, secret_id=str(secret_id), secret=refresh_token
-            )
-        except VaultError as exc:
-            logger.warning("Failed to update Airtable refresh token secret: %s", exc)
-            raise ToolError("Unable to update Airtable credentials.") from exc
-        refresh_secret_id = str(secret_id)
-    else:
-        slug = provider.replace(".", "-")
-        secret_name = f"{slug}-refresh-{organization_id}-{uuid4()}"
-        description = f"{provider.capitalize()} refresh token for org {organization_id}"
-        try:
-            refresh_secret_id, created_at = await create_secret(
-                settings,
-                name=secret_name,
-                secret=refresh_token,
-                description=description,
-            )
-        except VaultError as exc:
-            logger.warning("Failed to store Airtable refresh token: %s", exc)
-            raise ToolError("Unable to persist Airtable credentials.") from exc
-
-    await _run_in_thread(
-        repo.upsert_connection,
-        organization_id,
-        provider,
-        access_token=None,
-        refresh_token=None,
-        refresh_token_secret_id=refresh_secret_id,
-        refresh_token_secret_created_at=created_at,
-    )
-    return refresh_secret_id
-
-
 async def _refresh_airtable_token(
     *,
     organization_id: UUID,
@@ -305,27 +210,49 @@ async def _refresh_airtable_token(
     if isinstance(expires_in, (int, float)):
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
 
-    await _store_access_token(
-        organization_id=organization_id,
-        repo=repo,
-        connection=connection,
-        access_token=access_token,
+    try:
+        access_secret_id, access_secret_created_at = await persist_access_token_secret(
+            organization_id=organization_id,
+            provider="airtable",
+            access_token=access_token,
+            existing_secret_id=getattr(connection, "access_token_secret_id", None),
+        )
+    except IntegrationSecretError as exc:
+        logger.warning("Failed to persist Airtable access token: %s", exc)
+        raise ToolError("Unable to persist Airtable credentials.") from exc
+
+    await _run_in_thread(
+        repo.upsert_connection,
+        organization_id,
+        "airtable",
+        access_token=None,
+        refresh_token=None,
+        access_token_secret_id=access_secret_id,
+        access_token_secret_created_at=access_secret_created_at,
         expires_at=expires_at,
-        provider="airtable",
     )
 
     new_refresh_token = response.get("refresh_token")
     if isinstance(new_refresh_token, str) and new_refresh_token:
         try:
-            await _store_refresh_token(
+            refresh_secret_id, refresh_secret_created_at = await persist_refresh_token_secret(
                 organization_id=organization_id,
-                repo=repo,
-                connection=connection,
-                refresh_token=new_refresh_token,
                 provider="airtable",
+                refresh_token=new_refresh_token,
+                existing_secret_id=getattr(connection, "refresh_token_secret_id", None),
             )
-        except ToolError:
-            logger.warning("Failed to store rotated Airtable refresh token; keeping previous token.")
+        except IntegrationSecretError as exc:
+            logger.warning("Failed to persist Airtable refresh token: %s", exc)
+        else:
+            await _run_in_thread(
+                repo.upsert_connection,
+                organization_id,
+                "airtable",
+                access_token=None,
+                refresh_token=None,
+                refresh_token_secret_id=refresh_secret_id,
+                refresh_token_secret_created_at=refresh_secret_created_at,
+            )
     return access_token, expires_at
 
 
@@ -509,27 +436,49 @@ async def _refresh_gmail_token(
     if isinstance(expires_in, (int, float)):
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
 
-    await _store_access_token(
-        organization_id=organization_id,
-        repo=repo,
-        connection=connection,
-        access_token=access_token,
+    try:
+        access_secret_id, access_secret_created_at = await persist_access_token_secret(
+            organization_id=organization_id,
+            provider="gmail",
+            access_token=access_token,
+            existing_secret_id=getattr(connection, "access_token_secret_id", None),
+        )
+    except IntegrationSecretError as exc:
+        logger.warning("Failed to persist Gmail access token: %s", exc)
+        raise ToolError("Unable to persist Gmail credentials.") from exc
+
+    await _run_in_thread(
+        repo.upsert_connection,
+        organization_id,
+        "gmail",
+        access_token=None,
+        refresh_token=None,
+        access_token_secret_id=access_secret_id,
+        access_token_secret_created_at=access_secret_created_at,
         expires_at=expires_at,
-        provider="gmail",
     )
 
     new_refresh_token = response.get("refresh_token")
     if isinstance(new_refresh_token, str) and new_refresh_token:
         try:
-            await _store_refresh_token(
+            refresh_secret_id, refresh_secret_created_at = await persist_refresh_token_secret(
                 organization_id=organization_id,
-                repo=repo,
-                connection=connection,
-                refresh_token=new_refresh_token,
                 provider="gmail",
+                refresh_token=new_refresh_token,
+                existing_secret_id=getattr(connection, "refresh_token_secret_id", None),
             )
-        except ToolError:
-            logger.warning("Failed to store rotated Gmail refresh token; keeping previous token.")
+        except IntegrationSecretError as exc:
+            logger.warning("Failed to persist Gmail refresh token: %s", exc)
+        else:
+            await _run_in_thread(
+                repo.upsert_connection,
+                organization_id,
+                "gmail",
+                access_token=None,
+                refresh_token=None,
+                refresh_token_secret_id=refresh_secret_id,
+                refresh_token_secret_created_at=refresh_secret_created_at,
+            )
 
     return access_token, expires_at
 
@@ -642,6 +591,12 @@ def _build_airtable_find_record_tool(
         return None
 
     max_records = _resolve_max_records(tool_config.config.get("maxRecords"))
+
+    if isinstance(tool_config.config.get("persistFields"), list):
+        logger.info(
+            "persistFields configured for Airtable tool %s but persistence is no longer supported; ignoring",
+            tool_config.id,
+        )
 
     runtime_parameters = list(tool_config.runtime_parameters)
 
@@ -1004,6 +959,12 @@ def _build_gmail_send_email_tool(
         description=description,
         runtime_parameters=schema_parameters,
     )
+
+    if isinstance(config.get("persistFields"), list):
+        logger.info(
+            "persistFields configured for Gmail tool %s but persistence is no longer supported; ignoring",
+            tool_config.id,
+        )
 
     repo = IntegrationConnectionRepository(get_supabase_client())
     organization_id = workflow_config.organization_id

@@ -3,31 +3,49 @@
 from __future__ import annotations
 
 import base64
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from typing import Optional
-from urllib.parse import urlparse
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from ..config import Settings, get_settings
 from ..dependencies import get_organization_id, get_supabase_client
+from ..oauth.common import (
+    consume_state_nonce,
+    persist_state_nonce,
+    run_repo_call,
+    validate_redirect,
+)
 from ..oauth.state import StateTokenError, generate_state_token, verify_state_token
 from ..repositories.integrations_repo import IntegrationConnectionRepository
+from ..repositories.oauth_state_repo import OAuthStateRepository
 from ..services.gmail_oauth import (
     GmailOAuthError,
     build_authorize_url,
     exchange_code_for_tokens,
     fetch_userinfo,
 )
-from ..services.vault import create_secret, delete_secret
+from ..services.integration_secrets import (
+    IntegrationSecretError,
+    persist_access_token_secret,
+    persist_refresh_token_secret,
+)
 
-DEFAULT_SCOPES = ("https://www.googleapis.com/auth/gmail.send",)
+DEFAULT_SCOPES = (
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/gmail.send",
+)
 
 router = APIRouter(prefix="/oauth/gmail", tags=["Gmail OAuth"])
+
+logger = logging.getLogger(__name__)
+PROVIDER = "gmail"
 
 
 def _get_repo() -> IntegrationConnectionRepository:
@@ -35,15 +53,8 @@ def _get_repo() -> IntegrationConnectionRepository:
     return IntegrationConnectionRepository(client)
 
 
-def _validate_redirect(redirect: str, settings: Settings) -> None:
-    parsed_redirect = urlparse(redirect)
-    if not parsed_redirect.scheme or not parsed_redirect.netloc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect must be absolute")
-
-    allowed_origin = settings.frontend_base_url.rstrip("/")
-    parsed_allowed = urlparse(allowed_origin)
-    if (parsed_redirect.scheme, parsed_redirect.netloc) != (parsed_allowed.scheme, parsed_allowed.netloc):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect origin not allowed")
+async def _get_state_repo() -> OAuthStateRepository:
+    return await OAuthStateRepository.create()
 
 
 @router.get("/authorize", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
@@ -73,18 +84,31 @@ async def authorize_gmail(
     if not redirect:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing redirect parameter")
 
-    _validate_redirect(redirect, settings)
-    parsed_redirect = urlparse(redirect)
-    callback_origin = f"{parsed_redirect.scheme}://{parsed_redirect.netloc}"
+    callback_origin = validate_redirect(redirect, settings)
 
     code_verifier = secrets.token_urlsafe(64)
     code_challenge = base64.urlsafe_b64encode(sha256(code_verifier.encode("utf-8")).digest()).decode("utf-8").rstrip("=")
 
+    ttl_seconds = max(60, settings.oauth_state_ttl_seconds or 300)
+    nonce = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
+    state_repo = await _get_state_repo()
+    await persist_state_nonce(
+        repo=state_repo,
+        provider=PROVIDER,
+        nonce=nonce,
+        organization_id=resolved_org_id,
+        redirect_url=redirect,
+        origin=callback_origin,
+        code_verifier=code_verifier,
+        expires_at=expires_at,
+    )
+
     state = generate_state_token(
         organization_id=resolved_org_id,
         secret_key=settings.oauth_state_secret,
-        redirect_url=redirect,
-        extra={"pkce_v": code_verifier, "origin": callback_origin},
+        ttl_seconds=ttl_seconds,
+        nonce_value=nonce,
     )
 
     authorize_url = build_authorize_url(
@@ -128,16 +152,23 @@ async def gmail_callback(
     except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid organization in state") from exc
 
-    redirect_url = state_payload.get("redirect")
+    nonce = state_payload.get("nonce")
+    if not isinstance(nonce, str) or not nonce:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing state nonce")
+
+    state_repo = await _get_state_repo()
+    state_record = await consume_state_nonce(repo=state_repo, provider=PROVIDER, nonce=nonce)
+    if state_record.organization_id != organization_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Organization mismatch")
+
+    redirect_url = state_record.redirect_url
     if redirect_url:
-        _validate_redirect(redirect_url, settings)
+        validated_origin = validate_redirect(redirect_url, settings)
+        if state_record.origin and validated_origin != state_record.origin:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect origin mismatch")
 
-    origin_from_state = state_payload.get("origin")
-    if isinstance(origin_from_state, str):
-        _validate_redirect(origin_from_state, settings)
-
-    code_verifier = state_payload.get("pkce_v")
-    if not isinstance(code_verifier, str):
+    code_verifier = state_record.pkce_verifier
+    if not isinstance(code_verifier, str) or not code_verifier:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing PKCE verifier")
 
     try:
@@ -147,6 +178,10 @@ async def gmail_callback(
             settings=settings,
         )
     except GmailOAuthError as exc:
+        logger.warning(
+            "Gmail authorization code exchange failed",
+            extra={"organization_id": str(organization_id), "error": str(exc)},
+        )
         content = f"<h1>Gmail connection failed</h1><p>{exc}</p>"
         return HTMLResponse(content=content, status_code=status.HTTP_400_BAD_REQUEST)
 
@@ -168,8 +203,11 @@ async def gmail_callback(
             email = userinfo.get("email")
             if isinstance(email, str):
                 profile_email = email
-        except GmailOAuthError:
-            # Non-fatal; continue without profile details.
+        except GmailOAuthError as exc:
+            logger.debug(
+                "Failed to fetch Gmail profile email",
+                extra={"organization_id": str(organization_id), "error": str(exc)},
+            )
             profile_email = None
 
     expires_at = None
@@ -177,38 +215,49 @@ async def gmail_callback(
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
 
     repo = _get_repo()
-    existing = repo.get_connection(organization_id=organization_id, provider="gmail")
+    existing = await run_repo_call(repo.get_connection, organization_id, PROVIDER)
 
-    # Remove previous secrets if present
-    if existing and existing.refresh_token_secret_id:
-        await delete_secret(settings, secret_id=str(existing.refresh_token_secret_id))
-    if existing and existing.access_token_secret_id:
-        await delete_secret(settings, secret_id=str(existing.access_token_secret_id))
-
-    refresh_secret_name = f"gmail-refresh-{organization_id}-{uuid4()}"
-    refresh_secret_description = f"Gmail refresh token for org {organization_id}"
-    refresh_secret_id, refresh_secret_created_at = await create_secret(
-        settings,
-        name=refresh_secret_name,
-        secret=refresh_token,
-        description=refresh_secret_description,
-    )
+    try:
+        refresh_secret_id, refresh_secret_created_at = await persist_refresh_token_secret(
+            organization_id=organization_id,
+            provider=PROVIDER,
+            refresh_token=refresh_token,
+            existing_secret_id=getattr(existing, "refresh_token_secret_id", None) if existing else None,
+        )
+    except IntegrationSecretError as exc:
+        logger.exception(
+            "Failed to persist Gmail refresh token",
+            extra={"organization_id": str(organization_id)},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to store Gmail credentials",
+        ) from exc
 
     access_secret_id = None
     access_secret_created_at = None
     if isinstance(access_token, str) and access_token:
-        access_secret_name = f"gmail-access-{organization_id}-{uuid4()}"
-        access_secret_description = f"Gmail access token for org {organization_id}"
-        access_secret_id, access_secret_created_at = await create_secret(
-            settings,
-            name=access_secret_name,
-            secret=access_token,
-            description=access_secret_description,
-        )
+        try:
+            access_secret_id, access_secret_created_at = await persist_access_token_secret(
+                organization_id=organization_id,
+                provider=PROVIDER,
+                access_token=access_token,
+                existing_secret_id=getattr(existing, "access_token_secret_id", None) if existing else None,
+            )
+        except IntegrationSecretError as exc:
+            logger.exception(
+                "Failed to persist Gmail access token",
+                extra={"organization_id": str(organization_id)},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unable to store Gmail credentials",
+            ) from exc
 
-    repo.upsert_connection(
-        organization_id=organization_id,
-        provider="gmail",
+    await run_repo_call(
+        repo.upsert_connection,
+        organization_id,
+        PROVIDER,
         refresh_token=None,
         access_token=None,
         refresh_token_secret_id=refresh_secret_id,

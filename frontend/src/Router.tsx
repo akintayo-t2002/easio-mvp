@@ -4,6 +4,7 @@ import PlaceholderView from "./components/placeholder-view"
 import { WorkflowsPage } from "./pages/WorkflowsPage"
 import IntegrationsPage from "./pages/IntegrationsPage"
 import IntegrationsCallbackPage from "./pages/IntegrationsCallbackPage"
+import { CallLogsPage } from "./pages/CallLogsPage"
 
 export function AppRouter() {
   return (
@@ -16,7 +17,7 @@ export function AppRouter() {
           <Route path="/integrations" element={<IntegrationsPage />} />
           <Route path="/integrations/callback" element={<IntegrationsCallbackPage />} />
           <Route path="/analytics" element={<PlaceholderView title="Analytics" />} />
-          <Route path="/call-logs" element={<PlaceholderView title="Call Logs" />} />
+          <Route path="/call-logs" element={<CallLogsPage />} />
           <Route path="/settings" element={<PlaceholderView title="Settings" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

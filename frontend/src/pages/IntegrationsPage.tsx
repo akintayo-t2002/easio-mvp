@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Search } from "lucide-react"
 import { FaGoogle, FaSalesforce, FaSlack } from "react-icons/fa"
 import { SiZendesk, SiAirtable, SiGooglesheets } from "react-icons/si"
@@ -6,6 +6,9 @@ import type { IconType } from "react-icons"
 import { useIntegrationStatus } from "../hooks/useIntegrationStatus"
 import { disconnectIntegration } from "../lib/api"
 import { buildIntegrationAuthorizeUrls } from "../lib/utils"
+import { Card } from "../components/ui/card"
+import { Badge } from "../components/ui/badge"
+import { IntegrationCardSkeleton } from "../components/integrations/IntegrationCardSkeleton"
 
 interface Integration {
   id: string
@@ -13,6 +16,7 @@ interface Integration {
   description: string
   icon: IconType
   iconColor: string
+  status: "live" | "coming-soon"
 }
 
 const INTEGRATIONS: Integration[] = [
@@ -22,6 +26,7 @@ const INTEGRATIONS: Integration[] = [
     description: "Enable your AI worker send and manage messages",
     icon: FaGoogle,
     iconColor: "text-red-500",
+    status: "live",
   },
   {
     id: "salesforce",
@@ -29,6 +34,7 @@ const INTEGRATIONS: Integration[] = [
     description: "Keep your data and deals flowing with real-time updates",
     icon: FaSalesforce,
     iconColor: "text-blue-500",
+    status: "coming-soon",
   },
   {
     id: "google-sheets",
@@ -36,6 +42,7 @@ const INTEGRATIONS: Integration[] = [
     description: "Sync every call, log, update directly into your sheets",
     icon: SiGooglesheets,
     iconColor: "text-green-500",
+    status: "coming-soon",
   },
   {
     id: "airtable",
@@ -43,6 +50,7 @@ const INTEGRATIONS: Integration[] = [
     description: "Query records and create entries from calls",
     icon: SiAirtable,
     iconColor: "text-yellow-600",
+    status: "live",
   },
   {
     id: "zendesk",
@@ -50,6 +58,7 @@ const INTEGRATIONS: Integration[] = [
     description: "Create tickets and log resolutions from calls",
     icon: SiZendesk,
     iconColor: "text-green-600",
+    status: "coming-soon",
   },
   {
     id: "slack",
@@ -57,12 +66,12 @@ const INTEGRATIONS: Integration[] = [
     description: "Notify your team with call summaries and alerts instantly",
     icon: FaSlack,
     iconColor: "text-purple-500",
+    status: "coming-soon",
   },
 ]
 
 export default function IntegrationsPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [connectedIntegrations, setConnectedIntegrations] = useState<Record<string, boolean>>({})
   const airtableStatus = useIntegrationStatus("airtable")
   const gmailStatus = useIntegrationStatus("gmail")
   const [airtableActionPending, setAirtableActionPending] = useState(false)
@@ -72,11 +81,6 @@ export default function IntegrationsPage() {
   const [gmailConnectedEmail, setGmailConnectedEmail] = useState<string | null>(null)
 
   useEffect(() => {
-    setConnectedIntegrations((prev) => ({
-      ...prev,
-      airtable: Boolean(airtableStatus.status?.connected),
-      gmail: Boolean(gmailStatus.status?.connected),
-    }))
     if (airtableStatus.status?.connected) {
       setAirtableActionError(null)
     }
@@ -88,13 +92,22 @@ export default function IntegrationsPage() {
     }
   }, [airtableStatus.status?.connected, gmailStatus.status?.connected, gmailStatus.status?.email])
 
-  const filteredIntegrations = INTEGRATIONS.filter(
-    (integration) =>
-      integration.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      integration.description.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredIntegrations = useMemo(
+    () =>
+      INTEGRATIONS.filter(
+        (integration) =>
+          integration.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          integration.description.toLowerCase().includes(searchQuery.toLowerCase()),
+      ),
+    [searchQuery],
   )
 
   const handleToggle = async (integrationId: string) => {
+    const integrationMeta = INTEGRATIONS.find((integration) => integration.id === integrationId)
+    if (!integrationMeta || integrationMeta.status === "coming-soon") {
+      return
+    }
+
     if (integrationId === "airtable") {
       const currentlyConnected = Boolean(airtableStatus.status?.connected)
 
@@ -155,10 +168,7 @@ export default function IntegrationsPage() {
       return
     }
 
-    setConnectedIntegrations((prev) => ({
-      ...prev,
-      [integrationId]: !prev[integrationId],
-    }))
+    return
   }
 
   return (
@@ -187,40 +197,43 @@ export default function IntegrationsPage() {
             const Icon = integration.icon
             const isAirtable = integration.id === "airtable"
             const isGmail = integration.id === "gmail"
-            const isLoadingAirtable =
-              isAirtable && airtableStatus.isLoading && !airtableStatus.status
-            const isLoadingGmail = isGmail && gmailStatus.isLoading && !gmailStatus.status
-            const isBusyAirtable = isAirtable && (airtableStatus.isLoading || airtableActionPending)
-            const isBusyGmail = isGmail && (gmailStatus.isLoading || gmailActionPending)
-            const isConnected = isAirtable
-              ? Boolean(airtableStatus.status?.connected)
+            const integrationStatus = isAirtable ? airtableStatus : isGmail ? gmailStatus : null
+            const isComingSoon = integration.status === "coming-soon"
+            const isLoadingStatus = Boolean(integrationStatus?.isLoading)
+            const hasStatus = Boolean(integrationStatus?.status)
+            const showSkeleton = !isComingSoon && isLoadingStatus && !hasStatus
+
+            if (showSkeleton) {
+              return <IntegrationCardSkeleton key={integration.id} />
+            }
+
+            const isConnected = integrationStatus ? Boolean(integrationStatus.status?.connected) : false
+            const isBusy = isAirtable
+              ? airtableStatus.isLoading || airtableActionPending
               : isGmail
-              ? Boolean(gmailStatus.status?.connected)
-              : Boolean(connectedIntegrations[integration.id])
-            const isLoading = isAirtable ? isLoadingAirtable : isGmail ? isLoadingGmail : false
-            const isBusy = isAirtable ? isBusyAirtable : isGmail ? isBusyGmail : false
+                ? gmailStatus.isLoading || gmailActionPending
+                : false
             const errorMessage = isAirtable
               ? airtableActionError
               : isGmail
-              ? gmailActionError
-              : null
-            const connectedSubtitle = isGmail && isConnected
-              ? gmailStatus.status?.email ?? gmailConnectedEmail
-              : null
+                ? gmailActionError
+                : null
+            const connectedSubtitle =
+              isGmail && isConnected ? gmailStatus.status?.email ?? gmailConnectedEmail : null
 
             return (
-              <div
+              <Card
                 key={integration.id}
-                className="bg-card border border-border rounded-lg p-6 hover:border-accent transition-colors"
+                className="p-6 hover:border-accent transition-colors flex flex-col gap-4"
               >
-                <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start justify-between">
                   <div className={`w-10 h-10 flex items-center justify-center ${integration.iconColor}`}>
                     <Icon className="w-8 h-8" />
                   </div>
-
-                  {/* Toggle Switch */}
-                  {isLoading ? (
-                    <div className="h-6 w-11 rounded-full bg-gray-200 animate-pulse" aria-hidden="true" />
+                  {isComingSoon ? (
+                    <Badge variant="outline" className="text-[11px] uppercase tracking-wide">
+                      Coming Soon
+                    </Badge>
                   ) : (
                     <button
                       onClick={() => void handleToggle(integration.id)}
@@ -239,15 +252,22 @@ export default function IntegrationsPage() {
                   )}
                 </div>
 
-                <h3 className="text-base font-semibold text-text-primary mb-2">{integration.name}</h3>
-                <p className="text-sm text-text-secondary">{integration.description}</p>
-                {connectedSubtitle ? (
-                  <p className="mt-2 text-xs text-text-secondary">Connected as {connectedSubtitle}</p>
-                ) : null}
-                {errorMessage ? (
-                  <p className="mt-2 text-sm text-error">{errorMessage}</p>
-                ) : null}
-              </div>
+                <div>
+                  <h3 className="text-base font-semibold text-text-primary mb-2">{integration.name}</h3>
+                  <p className="text-sm text-text-secondary">{integration.description}</p>
+                  {connectedSubtitle ? (
+                    <p className="mt-2 text-xs text-text-secondary">Connected as {connectedSubtitle}</p>
+                  ) : null}
+                  {errorMessage ? (
+                    <p className="mt-2 text-sm text-error">{errorMessage}</p>
+                  ) : null}
+                  {isComingSoon ? (
+                    <p className="mt-2 text-xs text-text-tertiary">
+                      This integration is on our roadmap. Stay tuned!
+                    </p>
+                  ) : null}
+                </div>
+              </Card>
             )
           })}
         </div>
