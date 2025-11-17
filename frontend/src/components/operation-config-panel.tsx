@@ -1,34 +1,34 @@
-import * as Dialog from "@radix-ui/react-dialog"
-import { useEffect, useState } from "react"
-import { X, ArrowLeft, Plus, Trash2 } from "lucide-react"
-import { Button } from "./ui/button"
-import { Input } from "./ui/input"
-import { Textarea } from "./ui/textarea"
-import type { IntegrationDefinition, OperationDefinition } from "../config/operations"
-import type { ToolOperation, RuntimeParameter, ToolConfiguration } from "../types/workflow"
+import * as Dialog from '@radix-ui/react-dialog';
+import React, { useEffect, useState } from 'react';
+import { X, ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import type { IntegrationDefinition, OperationDefinition } from '../config/operations';
+import type { ToolOperation, RuntimeParameter, ToolConfiguration } from '../types/workflow';
 
 const GMAIL_OVERRIDE_KEYS = [
-  "fromAddress",
-  "senderName",
-  "replyTo",
-  "defaultSubject",
-  "defaultBody",
-  "defaultBodyIsHtml",
-  "maxRecipients",
-] as const
+  'fromAddress',
+  'senderName',
+  'replyTo',
+  'defaultSubject',
+  'defaultBody',
+  'defaultBodyIsHtml',
+  'maxRecipients',
+] as const;
 
 interface OperationConfigPanelProps {
-  integration: IntegrationDefinition
-  operation: OperationDefinition
-  open: boolean
-  onClose: () => void
-  onBack: () => void
-  onSave: (toolOperation: ToolOperation) => void
-  existingConfig?: ToolOperation | null
-  connectedEmail?: string | null
+  integration: IntegrationDefinition;
+  operation: OperationDefinition;
+  open: boolean;
+  onClose: () => void;
+  onBack: () => void;
+  onSave: (toolOperation: ToolOperation) => void;
+  existingConfig?: ToolOperation | null;
+  connectedEmail?: string | null;
 }
 
-export function OperationConfigPanel({
+export const OperationConfigPanel: React.FC<OperationConfigPanelProps> = ({
   integration,
   operation,
   open,
@@ -37,132 +37,127 @@ export function OperationConfigPanel({
   onSave,
   existingConfig,
   connectedEmail,
-}: OperationConfigPanelProps) {
-  const Icon = integration.icon
+}) => {
+  const Icon = integration.icon;
 
   // Initialize state from existing config or defaults
   const [llmDescription, setLlmDescription] = useState(
     existingConfig?.llmDescription || operation.defaultLlmDescription
-  )
-  const [configValues, setConfigValues] = useState<ToolConfiguration>(
-    existingConfig?.config || {}
-  )
+  );
+  const [configValues, setConfigValues] = useState<ToolConfiguration>(existingConfig?.config || {});
   const isAirtableFindRecord =
-    integration.id === "airtable" && operation.id === "find_record_by_field"
-  const isGmailSendEmail = integration.id === "gmail" && operation.id === "send_email"
+    integration.id === 'airtable' && operation.id === 'find_record_by_field';
+  const isGmailSendEmail = integration.id === 'gmail' && operation.id === 'send_email';
 
-  const [showAdvancedOverrides, setShowAdvancedOverrides] = useState(
-    () => !isGmailSendEmail,
-  )
+  const [showAdvancedOverrides, setShowAdvancedOverrides] = useState(() => !isGmailSendEmail);
 
   const [runtimeParameters, setRuntimeParameters] = useState<RuntimeParameter[]>(() => {
     const baseParams =
       existingConfig?.runtimeParameters && existingConfig.runtimeParameters.length > 0
         ? existingConfig.runtimeParameters
-        : operation.defaultRuntimeParameters
+        : operation.defaultRuntimeParameters;
 
     const cloned = baseParams.map((param) => ({
       name: param.name,
       llmDescription: param.llmDescription,
       required: param.required,
       dataType: param.dataType,
-    }))
+    }));
 
     if (isAirtableFindRecord) {
-      const ensured = cloned.length ? cloned : []
+      const ensured = cloned.length ? cloned : [];
       if (ensured.length === 0) {
         ensured.push({
-          name: "searchValue",
-          llmDescription: "Ask the caller for the value to look up.",
+          name: 'searchValue',
+          llmDescription: 'Ask the caller for the value to look up.',
           required: true,
-          dataType: "string",
-        })
+          dataType: 'string',
+        });
       } else {
         ensured[0] = {
-          name: "searchValue",
-          llmDescription:
-            ensured[0].llmDescription || "Ask the caller for the value to look up.",
+          name: 'searchValue',
+          llmDescription: ensured[0].llmDescription || 'Ask the caller for the value to look up.',
           required: true,
-          dataType: "string",
-        }
+          dataType: 'string',
+        };
       }
-      return ensured
+      return ensured;
     }
 
-    return cloned
-  })
+    return cloned;
+  });
 
   useEffect(() => {
     if (!isGmailSendEmail) {
-      return
+      return;
     }
 
     const hasOverrides = GMAIL_OVERRIDE_KEYS.some((key) => {
-      const value = configValues[key]
-      if (typeof value === "string") {
-        return value.trim().length > 0
+      const value = configValues[key];
+      if (typeof value === 'string') {
+        return value.trim().length > 0;
       }
-      return Boolean(value)
-    })
+      return Boolean(value);
+    });
 
     if (hasOverrides) {
-      setShowAdvancedOverrides(true)
+      setShowAdvancedOverrides(true);
     }
-  }, [configValues, isGmailSendEmail])
+  }, [configValues, isGmailSendEmail]);
 
   const handleConfigChange = (fieldName: string, value: string) => {
-    setConfigValues(prev => ({ ...prev, [fieldName]: value }))
-  }
+    setConfigValues((prev) => ({ ...prev, [fieldName]: value }));
+  };
 
   const handleBooleanConfigChange = (fieldName: string, value: boolean) => {
-    setConfigValues(prev => ({ ...prev, [fieldName]: value }))
-  }
+    setConfigValues((prev) => ({ ...prev, [fieldName]: value }));
+  };
 
   const getStringConfigValue = (value: unknown): string => {
-    if (typeof value === "string") {
-      return value
+    if (typeof value === 'string') {
+      return value;
     }
     if (value === null || value === undefined) {
-      return ""
+      return '';
     }
-    return String(value)
-  }
+    return String(value);
+  };
 
   const handleAddParameter = () => {
-    setRuntimeParameters(prev => [
+    setRuntimeParameters((prev) => [
       ...prev,
       {
-        name: "",
-        llmDescription: "",
+        name: '',
+        llmDescription: '',
         required: false,
-        dataType: "string",
+        dataType: 'string',
       },
-    ])
-  }
+    ]);
+  };
 
   const handleRemoveParameter = (index: number) => {
-    setRuntimeParameters(prev => prev.filter((_, i) => i !== index))
-  }
+    setRuntimeParameters((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const handleParameterChange = (
     index: number,
     field: keyof RuntimeParameter,
     value: string | boolean
   ) => {
-    setRuntimeParameters(prev =>
+    setRuntimeParameters((prev) =>
       prev.map((param, i) => (i === index ? { ...param, [field]: value } : param))
-    )
-  }
+    );
+  };
 
   const handleSave = () => {
     // Validate required config fields
     const missingFields = operation.configFields
-      .filter(field => field.required && !configValues[field.name])
-      .map(field => field.label)
+      .filter((field) => field.required && !configValues[field.name])
+      .map((field) => field.label);
 
     if (missingFields.length > 0) {
-      alert(`Please fill in required fields: ${missingFields.join(", ")}`)
-      return
+      alert(`Please fill in required fields: ${missingFields.join(', ')}`);
+      return;
     }
 
     const toolOperation: ToolOperation = {
@@ -173,10 +168,10 @@ export function OperationConfigPanel({
       llmDescription,
       config: configValues,
       runtimeParameters,
-    }
+    };
 
-    onSave(toolOperation)
-  }
+    onSave(toolOperation);
+  };
 
   return (
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -230,9 +225,11 @@ export function OperationConfigPanel({
                     </h3>
                     <div className="space-y-4 rounded-lg border border-border bg-background-secondary p-4">
                       <div>
-                        <p className="text-xs font-semibold uppercase text-text-secondary">Connected Gmail</p>
+                        <p className="text-xs font-semibold uppercase text-text-secondary">
+                          Connected Gmail
+                        </p>
                         <p className="mt-1 text-sm text-text-primary">
-                          {connectedEmail ? connectedEmail : "Email address unavailable"}
+                          {connectedEmail ? connectedEmail : 'Email address unavailable'}
                         </p>
                         <p className="mt-1 text-xs text-text-tertiary">
                           Emails are sent from this account unless you provide overrides.
@@ -244,16 +241,22 @@ export function OperationConfigPanel({
                         onClick={() => setShowAdvancedOverrides((prev) => !prev)}
                         className="text-xs font-medium text-accent transition-colors hover:underline"
                       >
-                        {showAdvancedOverrides ? "Hide advanced overrides" : "Show advanced overrides"}
+                        {showAdvancedOverrides
+                          ? 'Hide advanced overrides'
+                          : 'Show advanced overrides'}
                       </button>
 
                       {showAdvancedOverrides && (
                         <div className="space-y-4">
                           <div>
-                            <label className="text-sm font-medium text-text-primary">From Address Override</label>
+                            <label className="text-sm font-medium text-text-primary">
+                              From Address Override
+                            </label>
                             <Input
                               value={getStringConfigValue(configValues.fromAddress)}
-                              onChange={(event) => handleConfigChange("fromAddress", event.target.value)}
+                              onChange={(event) =>
+                                handleConfigChange('fromAddress', event.target.value)
+                              }
                               placeholder="Use connected Gmail address"
                               className="mt-1 border-border bg-background text-text-primary"
                             />
@@ -263,40 +266,56 @@ export function OperationConfigPanel({
                           </div>
 
                           <div>
-                            <label className="text-sm font-medium text-text-primary">Display Name</label>
+                            <label className="text-sm font-medium text-text-primary">
+                              Display Name
+                            </label>
                             <Input
                               value={getStringConfigValue(configValues.senderName)}
-                              onChange={(event) => handleConfigChange("senderName", event.target.value)}
+                              onChange={(event) =>
+                                handleConfigChange('senderName', event.target.value)
+                              }
                               placeholder="Customer Support"
                               className="mt-1 border-border bg-background text-text-primary"
                             />
                           </div>
 
                           <div>
-                            <label className="text-sm font-medium text-text-primary">Reply-To Address</label>
+                            <label className="text-sm font-medium text-text-primary">
+                              Reply-To Address
+                            </label>
                             <Input
                               value={getStringConfigValue(configValues.replyTo)}
-                              onChange={(event) => handleConfigChange("replyTo", event.target.value)}
+                              onChange={(event) =>
+                                handleConfigChange('replyTo', event.target.value)
+                              }
                               placeholder="support@company.com"
                               className="mt-1 border-border bg-background text-text-primary"
                             />
                           </div>
 
                           <div>
-                            <label className="text-sm font-medium text-text-primary">Fallback Subject</label>
+                            <label className="text-sm font-medium text-text-primary">
+                              Fallback Subject
+                            </label>
                             <Input
                               value={getStringConfigValue(configValues.defaultSubject)}
-                              onChange={(event) => handleConfigChange("defaultSubject", event.target.value)}
+                              onChange={(event) =>
+                                handleConfigChange('defaultSubject', event.target.value)
+                              }
                               placeholder="Used only if the agent cannot infer a subject"
                               className="mt-1 border-border bg-background text-text-primary"
                             />
                           </div>
 
                           <div>
-                            <label className="text-sm font-medium text-text-primary">Fallback Body</label>
+                            <label className="text-sm font-medium text-text-primary">
+                              Fallback Body
+                            </label>
                             <Textarea
                               value={getStringConfigValue(configValues.defaultBody)}
-                              onChange={(event) => handleConfigChange("defaultBody", event.target.value)}
+                              onChange={(event) =>
+                                handleConfigChange('defaultBody', event.target.value)
+                              }
                               placeholder="Used only if the agent cannot compose the email during the call"
                               className="mt-1 min-h-24 resize-none border-border bg-background text-text-primary"
                             />
@@ -306,18 +325,30 @@ export function OperationConfigPanel({
                             <label className="flex items-center gap-2 text-sm text-text-primary">
                               <input
                                 type="checkbox"
-                                checked={configValues.defaultBodyIsHtml === true || configValues.defaultBodyIsHtml === "true"}
-                                onChange={(event) => handleBooleanConfigChange("defaultBodyIsHtml", event.target.checked)}
+                                checked={
+                                  configValues.defaultBodyIsHtml === true ||
+                                  configValues.defaultBodyIsHtml === 'true'
+                                }
+                                onChange={(event) =>
+                                  handleBooleanConfigChange(
+                                    'defaultBodyIsHtml',
+                                    event.target.checked
+                                  )
+                                }
                                 className="rounded border-border text-accent focus:ring-offset-0"
                               />
                               Fallback body is HTML
                             </label>
 
                             <div className="flex flex-1 flex-col">
-                              <label className="text-sm font-medium text-text-primary">Max Recipients</label>
+                              <label className="text-sm font-medium text-text-primary">
+                                Max Recipients
+                              </label>
                               <Input
                                 value={getStringConfigValue(configValues.maxRecipients)}
-                                onChange={(event) => handleConfigChange("maxRecipients", event.target.value)}
+                                onChange={(event) =>
+                                  handleConfigChange('maxRecipients', event.target.value)
+                                }
                                 placeholder="Defaults to 5"
                                 className="mt-1 border-border bg-background text-text-primary"
                               />
@@ -328,11 +359,11 @@ export function OperationConfigPanel({
                             type="button"
                             onClick={() =>
                               setConfigValues((prev) => {
-                                const next = { ...prev }
+                                const next = { ...prev };
                                 GMAIL_OVERRIDE_KEYS.forEach((key) => {
-                                  delete next[key]
-                                })
-                                return next
+                                  delete next[key];
+                                });
+                                return next;
                               })
                             }
                             className="text-xs text-text-tertiary transition-colors hover:text-error"
@@ -391,7 +422,9 @@ export function OperationConfigPanel({
 
                   {isGmailSendEmail && (
                     <div className="mb-3 rounded-lg border border-border bg-background-secondary p-4 text-xs text-text-secondary">
-                      Guide the agent on how to gather or infer the recipient, subject, and body from the conversation. These prompts help the voice agent compose the email automatically.
+                      Guide the agent on how to gather or infer the recipient, subject, and body
+                      from the conversation. These prompts help the voice agent compose the email
+                      automatically.
                     </div>
                   )}
 
@@ -406,29 +439,29 @@ export function OperationConfigPanel({
                           What should the agent ask for?
                         </label>
                         <Textarea
-                          value={runtimeParameters[0]?.llmDescription ?? ""}
+                          value={runtimeParameters[0]?.llmDescription ?? ''}
                           onChange={(event) =>
                             setRuntimeParameters((prev) => {
                               const next = prev.length
                                 ? [...prev]
                                 : [
                                     {
-                                      name: "searchValue",
-                                      llmDescription: "",
+                                      name: 'searchValue',
+                                      llmDescription: '',
                                       required: true,
-                                      dataType: "string",
+                                      dataType: 'string',
                                     },
-                                  ]
+                                  ];
 
                               next[0] = {
                                 ...next[0],
-                                name: "searchValue",
+                                name: 'searchValue',
                                 required: true,
-                                dataType: "string",
+                                dataType: 'string',
                                 llmDescription: event.target.value,
-                              }
+                              };
 
-                              return next
+                              return next;
                             })
                           }
                           placeholder="Ask the caller for the value to look up."
@@ -451,22 +484,22 @@ export function OperationConfigPanel({
                           className="rounded-lg border border-border bg-background-secondary p-4"
                         >
                           <div className="mb-3 flex items-start justify-between">
-                          <Input
-                            value={param.name}
-                            onChange={(e) => handleParameterChange(index, "name", e.target.value)}
-                            placeholder="Parameter name (e.g., fieldName)"
-                            className="flex-1 border-border bg-background text-sm text-text-primary"
-                            readOnly={isGmailSendEmail}
-                          />
-                          {!isGmailSendEmail && (
-                            <button
-                              onClick={() => handleRemoveParameter(index)}
-                              className="ml-2 rounded p-1 text-text-tertiary transition-colors hover:bg-error/10 hover:text-error"
-                              title="Remove parameter"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
+                            <Input
+                              value={param.name}
+                              onChange={(e) => handleParameterChange(index, 'name', e.target.value)}
+                              placeholder="Parameter name (e.g., fieldName)"
+                              className="flex-1 border-border bg-background text-sm text-text-primary"
+                              readOnly={isGmailSendEmail}
+                            />
+                            {!isGmailSendEmail && (
+                              <button
+                                onClick={() => handleRemoveParameter(index)}
+                                className="ml-2 rounded p-1 text-text-tertiary transition-colors hover:bg-error/10 hover:text-error"
+                                title="Remove parameter"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
 
                           <div className="space-y-3">
@@ -475,7 +508,7 @@ export function OperationConfigPanel({
                               <Textarea
                                 value={param.llmDescription}
                                 onChange={(e) =>
-                                  handleParameterChange(index, "llmDescription", e.target.value)
+                                  handleParameterChange(index, 'llmDescription', e.target.value)
                                 }
                                 placeholder="What should the agent ask the user for?"
                                 className="mt-1 min-h-16 resize-none border-border bg-background text-sm text-text-primary"
@@ -488,7 +521,7 @@ export function OperationConfigPanel({
                                   type="checkbox"
                                   checked={param.required}
                                   onChange={(e) =>
-                                    handleParameterChange(index, "required", e.target.checked)
+                                    handleParameterChange(index, 'required', e.target.checked)
                                   }
                                   className="rounded border-border text-accent focus:ring-offset-0"
                                   disabled={isGmailSendEmail}
@@ -501,7 +534,7 @@ export function OperationConfigPanel({
                                 <select
                                   value={param.dataType}
                                   onChange={(e) =>
-                                    handleParameterChange(index, "dataType", e.target.value)
+                                    handleParameterChange(index, 'dataType', e.target.value)
                                   }
                                   className="rounded border border-border bg-background px-2 py-1 text-xs text-text-primary"
                                   disabled={isGmailSendEmail}
@@ -525,23 +558,23 @@ export function OperationConfigPanel({
 
             {/* Footer */}
             <div className="flex h-16 items-center justify-end gap-3 border-t border-border px-6 backdrop-blur">
-              <Button variant="outline" onClick={onBack} className="border-border text-text-primary">
+              <Button
+                variant="outline"
+                onClick={onBack}
+                className="border-border text-text-primary"
+              >
                 Back
               </Button>
               <Button
                 onClick={handleSave}
                 className="bg-button-primary-bg text-button-primary-text transition-opacity hover:opacity-90"
               >
-                {existingConfig ? "Update Operation" : "Add to Agent"}
+                {existingConfig ? 'Update Operation' : 'Add to Agent'}
               </Button>
             </div>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
-  )
-}
-
-
-
-
+  );
+};

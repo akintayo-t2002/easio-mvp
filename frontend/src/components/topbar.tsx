@@ -1,22 +1,22 @@
-import React, { useState, useRef, useEffect } from "react"
-import { ChevronDown, Play, Share2, Plus, Pencil, Loader2 } from "lucide-react"
-import { Button } from "./ui/button"
-import { Badge } from "./ui/badge"
-import type { WorkflowStatus } from "../types/workflow"
+import React, { useState, useRef, useEffect } from 'react';
+import { ChevronDown, Play, Share2, Plus, Pencil, Loader2 } from 'lucide-react';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import type { WorkflowStatus } from '../types/workflow';
 
 interface TopBarProps {
-  onAddAgent?: () => void
-  workflowName?: string
-  workflowId?: string
-  workflowStatus?: WorkflowStatus
-  onPublish?: () => Promise<void> | void
-  isPublishing?: boolean
-  onNameChange?: (name: string) => Promise<void>
-  onTest?: () => void
-  isTesting?: boolean
+  onAddAgent?: () => void;
+  workflowName?: string;
+  workflowId?: string;
+  workflowStatus?: WorkflowStatus;
+  onPublish?: () => Promise<void> | void;
+  isPublishing?: boolean;
+  onNameChange?: (name: string) => Promise<void>;
+  onTest?: () => void;
+  isTesting?: boolean;
 }
 
-export default function TopBar({
+const TopBar: React.FC<TopBarProps> = ({
   onAddAgent,
   workflowName,
   workflowId,
@@ -26,67 +26,69 @@ export default function TopBar({
   onNameChange,
   onTest,
   isTesting = false,
-}: TopBarProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editValue, setEditValue] = useState("")
-  const [isSaving, setIsSaving] = useState(false)
-  const [isHovered, setIsHovered] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const displayName = workflowName?.trim() ? workflowName : "Untitled Workflow"
-  const statusLabel = workflowStatus === "published" ? "Published" : "Draft"
+  const displayName = workflowName?.trim() ? workflowName : 'Untitled Workflow';
+  const statusLabel = workflowStatus === 'published' ? 'Published' : 'Draft';
   const statusClass =
-    workflowStatus === "published" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+    workflowStatus === 'published'
+      ? 'bg-green-100 text-green-800'
+      : 'bg-yellow-100 text-yellow-800';
 
-  const canEdit = Boolean(workflowId && onNameChange && !isPublishing)
+  const canEdit = Boolean(workflowId && onNameChange && !isPublishing);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
-      inputRef.current.focus()
-      inputRef.current.select()
+      inputRef.current.focus();
+      inputRef.current.select();
     }
-  }, [isEditing])
+  }, [isEditing]);
 
   const handleStartEdit = () => {
-    if (!canEdit) return
-    setEditValue(workflowName || "")
-    setIsEditing(true)
-  }
+    if (!canEdit) return;
+    setEditValue(workflowName || '');
+    setIsEditing(true);
+  };
 
   const handleSave = async () => {
     if (!onNameChange || !editValue.trim()) {
-      setIsEditing(false)
-      return
+      setIsEditing(false);
+      return;
     }
 
     if (editValue.trim() === workflowName?.trim()) {
-      setIsEditing(false)
-      return
+      setIsEditing(false);
+      return;
     }
 
-    setIsSaving(true)
+    setIsSaving(true);
     try {
-      await onNameChange(editValue.trim())
-      setIsEditing(false)
+      await onNameChange(editValue.trim());
+      setIsEditing(false);
     } catch (error) {
-      console.error("Failed to update workflow name", error)
+      console.error('Failed to update workflow name', error);
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   const handleCancel = () => {
-    setIsEditing(false)
-    setEditValue("")
-  }
+    setIsEditing(false);
+    setEditValue('');
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      void handleSave()
-    } else if (e.key === "Escape") {
-      handleCancel()
+    if (e.key === 'Enter') {
+      void handleSave();
+    } else if (e.key === 'Escape') {
+      handleCancel();
     }
-  }
+  };
 
   return (
     <div className="h-20 bg-background border-b border-border flex items-center justify-between px-6">
@@ -115,7 +117,7 @@ export default function TopBar({
               onClick={handleStartEdit}
               disabled={!canEdit}
               className={`flex items-center gap-2 text-text-primary transition-opacity ${
-                canEdit ? "hover:opacity-80 cursor-pointer" : "cursor-default"
+                canEdit ? 'hover:opacity-80 cursor-pointer' : 'cursor-default'
               }`}
             >
               <span className="font-semibold">{displayName}</span>
@@ -142,7 +144,7 @@ export default function TopBar({
         <Button
           onClick={() => {
             if (onTest) {
-              onTest()
+              onTest();
             }
           }}
           variant="ghost"
@@ -150,10 +152,18 @@ export default function TopBar({
           disabled={!onTest || isTesting}
           className="text-text-primary hover:bg-background-secondary disabled:opacity-60"
         >
-          {isTesting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
-          {isTesting ? "Testing…" : "Test"}
+          {isTesting ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <Play className="w-4 h-4 mr-2" />
+          )}
+          {isTesting ? 'Testing…' : 'Test'}
         </Button>
-        <Button variant="ghost" size="sm" className="text-text-primary hover:bg-background-secondary">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-text-primary hover:bg-background-secondary"
+        >
           <Share2 className="w-4 h-4 mr-2" />
           Share
         </Button>
@@ -163,21 +173,15 @@ export default function TopBar({
           className="bg-button-primary-bg text-button-primary-text hover:opacity-90 border border-text-primary"
           onClick={() => {
             if (onPublish) {
-              void onPublish()
+              void onPublish();
             }
           }}
         >
-          {isPublishing ? "Publishing…" : "Publish"}
+          {isPublishing ? 'Publishing…' : 'Publish'}
         </Button>
       </div>
     </div>
-  )
-}
+  );
+};
 
-
-
-
-
-
-
-
+export default TopBar;

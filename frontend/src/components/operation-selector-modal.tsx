@@ -1,21 +1,22 @@
-import * as Dialog from "@radix-ui/react-dialog"
-import { X, ArrowLeft } from "lucide-react"
-import { Button } from "./ui/button"
-import type { IntegrationDefinition, OperationDefinition } from "../config/operations"
+import * as Dialog from '@radix-ui/react-dialog';
+import { X, ArrowLeft } from 'lucide-react';
+import { Button } from './ui/button';
+import type { IntegrationDefinition, OperationDefinition } from '../config/operations';
+import React from 'react';
 
 interface OperationSelectorModalProps {
-  integration: IntegrationDefinition
-  open: boolean
-  onClose: () => void
-  onConfigure: (operation: OperationDefinition) => void
-  isConnected?: boolean
-  onConnect?: () => void
-  onManageConnection?: () => void
-  isConnecting?: boolean
-  connectError?: string | null
+  integration: IntegrationDefinition;
+  open: boolean;
+  onClose: () => void;
+  onConfigure: (operation: OperationDefinition) => void;
+  isConnected?: boolean;
+  onConnect?: () => void;
+  onManageConnection?: () => void;
+  isConnecting?: boolean;
+  connectError?: string | null;
 }
 
-export function OperationSelectorModal({
+export const OperationSelectorModal: React.FC<OperationSelectorModalProps> = ({
   integration,
   open,
   onClose,
@@ -25,8 +26,8 @@ export function OperationSelectorModal({
   onManageConnection = () => {},
   isConnecting = false,
   connectError = null,
-}: OperationSelectorModalProps) {
-  const Icon = integration.icon
+}) => {
+  const Icon = integration.icon;
 
   if (integration.operations.length === 0) {
     return (
@@ -68,7 +69,7 @@ export function OperationSelectorModal({
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    )
+    );
   }
 
   return (
@@ -160,19 +161,15 @@ export function OperationSelectorModal({
                     disabled={isConnecting}
                     className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                   >
-                    {isConnecting ? "Connecting…" : "Connect"}
+                    {isConnecting ? 'Connecting…' : 'Connect'}
                   </button>
                 </div>
               )}
-              {connectError ? (
-                <p className="mt-2 text-xs text-red-600">{connectError}</p>
-              ) : null}
+              {connectError ? <p className="mt-2 text-xs text-red-600">{connectError}</p> : null}
             </div>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
-  )
-}
-
-
+  );
+};

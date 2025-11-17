@@ -1,64 +1,70 @@
-import { useEffect, useState } from "react"
-import { X, Plus, Trash2 } from "lucide-react"
-import { Button } from "./ui/button"
-import { Input } from "./ui/input"
-import { Textarea } from "./ui/textarea"
-import { Card } from "./ui/card"
+import React, { useEffect, useState } from 'react';
+import { X, Plus, Trash2 } from 'lucide-react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import { Card } from './ui/card';
 
 interface Variable {
-  id: string
-  name: string
-  description: string
-  required: boolean
+  id: string;
+  name: string;
+  description: string;
+  required: boolean;
 }
 
 interface PathSheetProps {
-  isOpen: boolean
-  onCancel: () => void
+  isOpen: boolean;
+  onCancel: () => void;
   onSave: (path: {
-    name: string
-    description?: string
-    transferMessage?: string
-    variables: Variable[]
-    targetAgentId: string
-    hideEdge: boolean
-  }) => Promise<boolean> | boolean
-  agents: { id: string; name: string }[]
-  defaultTargetAgentId?: string | null
+    name: string;
+    description?: string;
+    transferMessage?: string;
+    variables: Variable[];
+    targetAgentId: string;
+    hideEdge: boolean;
+  }) => Promise<boolean> | boolean;
+  agents: { id: string; name: string }[];
+  defaultTargetAgentId?: string | null;
 }
 
-export default function PathSheet({ isOpen, onCancel, onSave, agents, defaultTargetAgentId }: PathSheetProps) {
-  const [pathName, setPathName] = useState("")
-  const [description, setDescription] = useState("")
-  const [transferMessage, setTransferMessage] = useState("")
-  const [variables, setVariables] = useState<Variable[]>([])
-  const [targetAgentId, setTargetAgentId] = useState<string>("")
-  const [hideEdge, setHideEdge] = useState(false)
+const PathSheet: React.FC<PathSheetProps> = ({
+  isOpen,
+  onCancel,
+  onSave,
+  agents,
+  defaultTargetAgentId,
+}) => {
+  const [pathName, setPathName] = useState('');
+  const [description, setDescription] = useState('');
+  const [transferMessage, setTransferMessage] = useState('');
+  const [variables, setVariables] = useState<Variable[]>([]);
+  const [targetAgentId, setTargetAgentId] = useState<string>('');
+  const [hideEdge, setHideEdge] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setTargetAgentId(defaultTargetAgentId ?? "")
-      setHideEdge(false)
+      setTargetAgentId(defaultTargetAgentId ?? '');
+      setHideEdge(false);
     }
-  }, [defaultTargetAgentId, isOpen])
+  }, [defaultTargetAgentId, isOpen]);
 
   const handleAddVariable = () => {
     const newVariable: Variable = {
       id: Date.now().toString(),
-      name: "",
-      description: "",
+      name: '',
+      description: '',
       required: false,
-    }
-    setVariables([...variables, newVariable])
-  }
+    };
+    setVariables([...variables, newVariable]);
+  };
 
   const handleRemoveVariable = (id: string) => {
-    setVariables(variables.filter((v) => v.id !== id))
-  }
+    setVariables(variables.filter((v) => v.id !== id));
+  };
 
   const handleUpdateVariable = (id: string, field: string, value: any) => {
-    setVariables(variables.map((v) => (v.id === id ? { ...v, [field]: value } : v)))
-  }
+    setVariables(variables.map((v) => (v.id === id ? { ...v, [field]: value } : v)));
+  };
 
   const handleSave = async () => {
     const success = await onSave({
@@ -68,24 +74,24 @@ export default function PathSheet({ isOpen, onCancel, onSave, agents, defaultTar
       variables,
       targetAgentId,
       hideEdge,
-    })
+    });
     if (success) {
-      resetForm()
+      resetForm();
     }
-  }
+  };
 
   const resetForm = () => {
-    setPathName("")
-    setDescription("")
-    setTransferMessage("")
-    setVariables([])
-    setTargetAgentId("")
-    setHideEdge(false)
-  }
+    setPathName('');
+    setDescription('');
+    setTransferMessage('');
+    setVariables([]);
+    setTargetAgentId('');
+    setHideEdge(false);
+  };
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
-  const disableSave = !pathName || !targetAgentId
+  const disableSave = !pathName || !targetAgentId;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end">
@@ -93,8 +99,8 @@ export default function PathSheet({ isOpen, onCancel, onSave, agents, defaultTar
       <div
         className="absolute inset-0 bg-black/50"
         onClick={() => {
-          resetForm()
-          onCancel()
+          resetForm();
+          onCancel();
         }}
       />
 
@@ -105,8 +111,8 @@ export default function PathSheet({ isOpen, onCancel, onSave, agents, defaultTar
           <h2 className="font-semibold text-text-primary">Configure Path</h2>
           <button
             onClick={() => {
-              resetForm()
-              onCancel()
+              resetForm();
+              onCancel();
             }}
             className="p-1 hover:bg-background-secondary rounded transition-colors"
           >
@@ -129,7 +135,9 @@ export default function PathSheet({ isOpen, onCancel, onSave, agents, defaultTar
 
           {/* Description */}
           <div>
-            <label className="text-xs font-semibold text-text-secondary uppercase">Description</label>
+            <label className="text-xs font-semibold text-text-secondary uppercase">
+              Description
+            </label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -140,7 +148,9 @@ export default function PathSheet({ isOpen, onCancel, onSave, agents, defaultTar
 
           {/* Transfer Message */}
           <div>
-            <label className="text-xs font-semibold text-text-secondary uppercase">Transfer Message</label>
+            <label className="text-xs font-semibold text-text-secondary uppercase">
+              Transfer Message
+            </label>
             <Textarea
               value={transferMessage}
               onChange={(e) => setTransferMessage(e.target.value)}
@@ -151,7 +161,9 @@ export default function PathSheet({ isOpen, onCancel, onSave, agents, defaultTar
 
           {/* Target Agent */}
           <div>
-            <label className="text-xs font-semibold text-text-secondary uppercase">Target Agent</label>
+            <label className="text-xs font-semibold text-text-secondary uppercase">
+              Target Agent
+            </label>
             <select
               value={targetAgentId}
               onChange={(e) => setTargetAgentId(e.target.value)}
@@ -184,7 +196,9 @@ export default function PathSheet({ isOpen, onCancel, onSave, agents, defaultTar
           {/* Required Variables */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <label className="text-xs font-semibold text-text-secondary uppercase">Required Variables</label>
+              <label className="text-xs font-semibold text-text-secondary uppercase">
+                Required Variables
+              </label>
               <button
                 onClick={handleAddVariable}
                 className="flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold text-accent hover:bg-background-secondary transition-colors"
@@ -200,13 +214,15 @@ export default function PathSheet({ isOpen, onCancel, onSave, agents, defaultTar
                   <div className="space-y-3">
                     <Input
                       value={variable.name}
-                      onChange={(e) => handleUpdateVariable(variable.id, "name", e.target.value)}
+                      onChange={(e) => handleUpdateVariable(variable.id, 'name', e.target.value)}
                       placeholder="Variable name (e.g., account_id)"
                       className="bg-background border-border text-xs text-text-primary"
                     />
                     <Textarea
                       value={variable.description}
-                      onChange={(e) => handleUpdateVariable(variable.id, "description", e.target.value)}
+                      onChange={(e) =>
+                        handleUpdateVariable(variable.id, 'description', e.target.value)
+                      }
                       placeholder="Description"
                       className="bg-background border-border resize-none text-xs text-text-primary"
                     />
@@ -215,7 +231,9 @@ export default function PathSheet({ isOpen, onCancel, onSave, agents, defaultTar
                         <input
                           type="checkbox"
                           checked={variable.required}
-                          onChange={(e) => handleUpdateVariable(variable.id, "required", e.target.checked)}
+                          onChange={(e) =>
+                            handleUpdateVariable(variable.id, 'required', e.target.checked)
+                          }
                           className="rounded"
                         />
                         Required
@@ -239,8 +257,8 @@ export default function PathSheet({ isOpen, onCancel, onSave, agents, defaultTar
           <Button
             variant="outline"
             onClick={() => {
-              resetForm()
-              onCancel()
+              resetForm();
+              onCancel();
             }}
             className="border-border text-text-primary bg-transparent"
           >
@@ -248,7 +266,7 @@ export default function PathSheet({ isOpen, onCancel, onSave, agents, defaultTar
           </Button>
           <Button
             onClick={() => {
-              void handleSave()
+              void handleSave();
             }}
             disabled={disableSave}
             className="bg-button-primary-bg text-button-primary-text hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -258,13 +276,7 @@ export default function PathSheet({ isOpen, onCancel, onSave, agents, defaultTar
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-
-
-
-
-
-
-
+export default PathSheet;

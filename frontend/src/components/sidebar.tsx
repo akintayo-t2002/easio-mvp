@@ -1,21 +1,33 @@
-import { LayoutDashboard, Workflow, Zap, BarChart3, Phone, Settings, HelpCircle, MoreHorizontal } from "lucide-react"
-import { NavLink } from "react-router-dom"
+import {
+  LayoutDashboard,
+  Workflow,
+  Zap,
+  BarChart3,
+  Phone,
+  Settings,
+  HelpCircle,
+  MoreHorizontal,
+} from 'lucide-react';
+import React from 'react';
+import { NavLink } from 'react-router-dom';
 
-export default function Sidebar() {
+const Sidebar: React.FC = () => {
   const navItems = [
-    { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-    { icon: Workflow, label: "Workflows", path: "/workflows" },
-    { icon: Zap, label: "Integrations", path: "/integrations" },
-    { icon: BarChart3, label: "Analytics", path: "/analytics" },
-    { icon: Phone, label: "Call Logs", path: "/call-logs" },
-  ]
+    { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
+    { icon: Workflow, label: 'Workflows', path: '/workflows' },
+    { icon: Zap, label: 'Integrations', path: '/integrations' },
+    { icon: BarChart3, label: 'Analytics', path: '/analytics' },
+    { icon: Phone, label: 'Call Logs', path: '/call-logs' },
+  ];
 
   return (
-    <div className="w-60 bg-background border-r border-border flex flex-col">
+    <aside className="w-60 bg-background border-r border-border flex flex-col">
       {/* Logo */}
       <div className="h-20 px-6 flex items-center border-b border-border">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-white font-bold">V</div>
+          <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-white font-bold">
+            V
+          </div>
           <span className="font-semibold text-text-primary">Voice Agent</span>
         </div>
       </div>
@@ -26,12 +38,12 @@ export default function Sidebar() {
           <NavLink
             key={item.label}
             to={item.path}
-            end={item.path === "/"}
+            end={item.path === '/'}
             className={({ isActive }) =>
               `w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 isActive
-                  ? "bg-black text-white border-l-4 border-black"
-                  : "text-text-secondary hover:bg-background-secondary hover:text-text-primary"
+                  ? 'bg-black text-white border-l-4 border-black'
+                  : 'text-text-secondary hover:bg-background-secondary hover:text-text-primary'
               }`
             }
           >
@@ -48,8 +60,8 @@ export default function Sidebar() {
           className={({ isActive }) =>
             `w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               isActive
-                ? "bg-black text-white"
-                : "text-text-secondary hover:bg-background-secondary hover:text-text-primary"
+                ? 'bg-black text-white'
+                : 'text-text-secondary hover:bg-background-secondary hover:text-text-primary'
             }`
           }
         >
@@ -75,15 +87,7 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
-    </div>
-  )
-}
-
-
-
-
-
-
-
-
-
+    </aside>
+  );
+};
+export default Sidebar;
