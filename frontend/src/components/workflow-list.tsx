@@ -1,59 +1,54 @@
-import React, { useState } from 'react';
-import { Plus, Zap, Clock } from 'lucide-react';
-import { Button } from './ui/button';
-import LoadingSpinner from './LoadingSpinner';
-import type { WorkflowSummary } from '../types/workflow';
+import { useState } from "react"
+import { Plus, Zap, Clock } from "lucide-react"
+import { Button } from "./ui/button"
+import type { WorkflowSummary } from "../types/workflow"
 
 interface WorkflowsListProps {
-  onCreateWorkflow: () => void;
-  onSelectWorkflow: (workflow: WorkflowSummary) => void;
-  workflows?: WorkflowSummary[];
-  isLoading?: boolean;
-  isCreating?: boolean;
+  onCreateWorkflow: () => void
+  onSelectWorkflow: (workflow: WorkflowSummary) => void
+  workflows?: WorkflowSummary[]
+  isLoading?: boolean
+  isCreating?: boolean
 }
 
-const WorkflowsList: React.FC<WorkflowsListProps> = ({
-  onCreateWorkflow,
-  onSelectWorkflow,
-  workflows = [],
-  isLoading = false,
-  isCreating = false,
-}) => {
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
+export default function WorkflowsList({ onCreateWorkflow, onSelectWorkflow, workflows = [], isLoading = false, isCreating = false }: WorkflowsListProps) {
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
 
-  const hasWorkflows = workflows.length > 0;
+  const hasWorkflows = workflows.length > 0
+  const showSkeletonGrid = isLoading && !hasWorkflows
 
   return (
     <div className="workflow-fade-enter flex-1 flex flex-col bg-white relative">
-      {/* Loading Overlay */}
-      {(isLoading || isCreating) && (
-        <div className="absolute inset-0 bg-white bg-opacity-90 z-50 flex items-center justify-center">
-          <LoadingSpinner
-            message={isCreating ? 'Creating workflow...' : 'Loading workflows...'}
-            size="lg"
-          />
+      {/* Creation Overlay */}
+      {isCreating && (
+        <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center text-sm font-medium text-text-secondary">
+          Creating workflow...
         </div>
       )}
-      {/* Header */}
-      <div className="border-b border-border px-8 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-text-primary">Workflows</h1>
-            <p className="mt-1 text-text-secondary">Create and manage your voice agent workflows</p>
-          </div>
-          <Button
-            onClick={onCreateWorkflow}
-            className="flex items-center gap-2 bg-button-primary-bg hover:bg-black text-button-primary-text px-6 py-2 rounded-lg transition-colors"
-          >
-            <Plus size={20} />
-            New Workflow
-          </Button>
-        </div>
-      </div>
-
-      {/* Content */}
       <div className="flex-1 overflow-auto">
         {!hasWorkflows ? (
+          showSkeletonGrid ? (
+            <div className="p-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div
+                    key={`workflow-skeleton-${index}`}
+                    className="h-48 rounded-lg border border-border bg-background-secondary/60 animate-pulse"
+                  >
+                    <div className="h-full w-full p-6 space-y-4">
+                      <div className="h-4 w-24 rounded bg-background" />
+                      <div className="h-5 w-3/4 rounded bg-background" />
+                      <div className="space-y-2">
+                        <div className="h-3 w-full rounded bg-background" />
+                        <div className="h-3 w-5/6 rounded bg-background" />
+                      </div>
+                      <div className="h-4 w-1/2 rounded bg-background" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
           // Empty State
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-md">
@@ -75,6 +70,7 @@ const WorkflowsList: React.FC<WorkflowsListProps> = ({
               </Button>
             </div>
           </div>
+          )
         ) : (
           // Workflows Grid
           <div className="p-8">
@@ -90,20 +86,20 @@ const WorkflowsList: React.FC<WorkflowsListProps> = ({
                   <div
                     className={`h-full border border-workflow-card-border rounded-lg p-6 transition-all duration-200 ${
                       hoveredId === workflow.id
-                        ? 'bg-workflow-card-hover shadow-lg border-accent'
-                        : 'bg-workflow-card-bg hover:shadow-md'
+                        ? "bg-workflow-card-hover shadow-lg border-accent"
+                        : "bg-workflow-card-bg hover:shadow-md"
                     }`}
                   >
                     {/* Status Badge */}
                     <div className="flex items-center justify-between mb-4">
                       <span
                         className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                          workflow.status === 'published'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
+                          workflow.status === "published"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-yellow-100 text-yellow-800"
                         }`}
                       >
-                        {workflow.status === 'published' ? 'Published' : 'Draft'}
+                        {workflow.status === "published" ? "Published" : "Draft"}
                       </span>
                     </div>
 
@@ -114,7 +110,7 @@ const WorkflowsList: React.FC<WorkflowsListProps> = ({
 
                     {/* Description */}
                     <p className="text-text-secondary text-sm mb-4 line-clamp-2">
-                      {workflow.description || 'No description provided'}
+                      {workflow.description || "No description provided"}
                     </p>
 
                     {/* Metadata */}
@@ -141,7 +137,5 @@ const WorkflowsList: React.FC<WorkflowsListProps> = ({
         )}
       </div>
     </div>
-  );
-};
-
-export default WorkflowsList;
+  )
+}

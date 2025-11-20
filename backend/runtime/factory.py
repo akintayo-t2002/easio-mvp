@@ -1,5 +1,6 @@
 """Factory for creating dynamic LiveKit agents from configuration."""
 
+import json
 import logging
 import re
 from dataclasses import dataclass, field
@@ -7,10 +8,11 @@ from typing import Any, Callable, Optional
 
 from livekit.agents import JobContext
 from livekit.agents.llm import function_tool
+from livekit.agents.llm.tool_context import ToolError
 from livekit.agents.voice import Agent, RunContext
 from livekit.plugins import assemblyai, cartesia, deepgram, openai, silero
 
-from .config import AgentConfig, PathConfig, WorkflowRuntimeConfig
+from .config import AgentConfig, PathConfig, PathVariableConfig, WorkflowRuntimeConfig
 from .tool_registry import build_tool_functions
 
 logger = logging.getLogger("agent-factory")
@@ -25,6 +27,7 @@ class UserData:
     personas: dict[str, Agent] = field(default_factory=dict)
     ctx: Optional[JobContext] = None
     workflow_config: Optional[WorkflowRuntimeConfig] = None
+    path_variables: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 RunContext_T = RunContext[UserData]
@@ -75,7 +78,49 @@ class BaseConfigurableAgent(Agent):
         await self.update_chat_ctx(chat_ctx)
         self.session.generate_reply()
 
-    async def _transfer_to_agent(self, target_agent_id: str, context: RunContext_T) -> Agent:
+    def set_path_variable(self, path_id: str, variable: str, value: Any) -> None:
+        """Persist a structured value for the specified path variable."""
+
+        store = self.session.userdata.path_variables.setdefault(path_id, {})
+        store[variable] = value
+
+    def get_path_variables(self, path_id: str) -> dict[str, Any]:
+        """Return collected variables for a given path."""
+
+        return dict(self.session.userdata.path_variables.get(path_id, {}))
+
+    def _prepare_handoff_summary(self, path: PathConfig) -> Optional[dict[str, Any]]:
+        path_id = str(path.id)
+        collected = self.get_path_variables(path_id)
+
+        allowed_names = {var.name for var in path.required_variables}
+        filtered = (
+            {name: value for name, value in collected.items() if name in allowed_names}
+            if allowed_names
+            else collected
+        )
+
+        missing = [var.name for var in path.required_variables if var.name not in filtered]
+        if missing:
+            raise ToolError(
+                "Collect required variables before transferring: " + ", ".join(sorted(missing))
+            )
+
+        if not filtered:
+            return None
+
+        return {
+            "path_id": path_id,
+            "path_name": path.name or path_id,
+            "variables": filtered,
+        }
+
+    async def _transfer_to_agent(
+        self,
+        target_agent_id: str,
+        context: RunContext_T,
+        handoff_summary: Optional[dict[str, Any]] = None,
+    ) -> Agent:
         """Transfer to another agent while preserving context."""
         userdata = context.userdata
         next_agent = userdata.personas.get(target_agent_id)
@@ -85,6 +130,15 @@ class BaseConfigurableAgent(Agent):
             raise ValueError(f"Agent {target_agent_id} not found")
 
         chat_ctx = self.session.history.copy()
+        if handoff_summary and handoff_summary.get("variables"):
+            try:
+                summary_payload = json.dumps(handoff_summary, ensure_ascii=False, default=str)
+            except TypeError:
+                summary_payload = str(handoff_summary)
+            chat_ctx.add_message(
+                role="system",
+                content=f"Structured handoff context: {summary_payload}",
+            )
         await next_agent.update_chat_ctx(chat_ctx)
         return next_agent
 
@@ -134,6 +188,15 @@ class AgentFactory:
             setattr(agent, tool_func.__name__, bound_tool)
             integration_tools.append(bound_tool)
 
+        # Create variable collection helpers for each path variable
+        variable_tools: list[Any] = []
+        for path in agent_config.paths:
+            for variable in path.required_variables:
+                var_tool = self._create_variable_tool(path, variable)
+                bound_tool = var_tool.__get__(agent, type(agent))
+                setattr(agent, var_tool.__name__, bound_tool)
+                variable_tools.append(bound_tool)
+
         # Dynamically create transfer functions for each path
         transfer_tools: list[Any] = []
         for path in agent_config.paths:
@@ -142,9 +205,9 @@ class AgentFactory:
             setattr(agent, f"transfer_to_{path.id}", bound_method)
             transfer_tools.append(bound_method)
 
-        if integration_tools or transfer_tools:
+        if integration_tools or transfer_tools or variable_tools:
             existing_tools = getattr(agent, "_tools", [])
-            merged_tools = existing_tools + integration_tools + transfer_tools
+            merged_tools = existing_tools + integration_tools + variable_tools + transfer_tools
             seen = set()
             deduped_tools = []
             for tool in merged_tools:
@@ -194,17 +257,120 @@ class AgentFactory:
 
         @function_tool(name=tool_name, description=tool_description)
         async def transfer_func(self: BaseConfigurableAgent, context: RunContext_T) -> Agent:
+            handoff_summary = self._prepare_handoff_summary(path)
             if transfer_message:
                 await self.session.say(transfer_message)
-            return await self._transfer_to_agent(target_agent_id, context)
+            return await self._transfer_to_agent(
+                target_agent_id,
+                context,
+                handoff_summary=handoff_summary,
+            )
 
         transfer_func.__name__ = f"transfer_to_{target_agent_id}"
         return transfer_func
+
+    def _create_variable_tool(self, path: PathConfig, variable: PathVariableConfig) -> Callable:
+        """Create a tool that stores a path variable before transfer."""
+
+        path_label = path.name or str(path.id)
+        base_name = f"record_{path_label}_{variable.name or 'value'}"
+        tool_name = self._slugify(base_name)
+        path_id = str(path.id)
+        description = variable.description or f"Capture {variable.name} for path {path_label}."
+        tool_description = f"{description} (Required)."
+
+        schema = {
+            "name": tool_name,
+            "description": tool_description,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "type": self._json_schema_type(variable.data_type),
+                        "description": variable.description or f"Value for {variable.name}.",
+                    }
+                },
+                "required": ["value"],
+                "additionalProperties": False,
+            },
+        }
+
+        @function_tool(raw_schema=schema)
+        async def record_variable(self: BaseConfigurableAgent, raw_arguments: dict[str, Any]) -> dict[str, Any]:
+            if not isinstance(raw_arguments, dict):
+                raise ToolError("Invalid arguments payload for variable collection.")
+            if "value" not in raw_arguments:
+                raise ToolError("Parameter 'value' is required.")
+
+            coerced = AgentFactory._coerce_variable_value(raw_arguments["value"], variable.data_type)
+            self.set_path_variable(path_id, variable.name, coerced)
+            return {
+                "stored": True,
+                "path_id": path_id,
+                "variable": variable.name,
+            }
+
+        record_variable.__name__ = f"record_{path.id.hex}_{self._slugify(variable.name)}"
+        return record_variable
 
     @staticmethod
     def _slugify(value: str) -> str:
         slug = re.sub(r"[^a-zA-Z0-9]+", "_", value).strip("_").lower()
         return slug or "transfer"
+
+    @staticmethod
+    def _json_schema_type(data_type: Optional[str]) -> Any:
+        mapping = {
+            "string": "string",
+            "number": "number",
+            "float": "number",
+            "integer": "integer",
+            "int": "integer",
+            "boolean": "boolean",
+            "bool": "boolean",
+        }
+        return mapping.get((data_type or "string").lower(), "string")
+
+    @staticmethod
+    def _coerce_variable_value(value: Any, data_type: Optional[str]) -> Any:
+        kind = (data_type or "string").lower()
+
+        if kind in {"string", "text", ""}:
+            if value is None:
+                raise ToolError("Value cannot be null.")
+            return str(value)
+
+        if kind in {"number", "float"}:
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                raise ToolError("Value must be a number.")
+
+        if kind in {"integer", "int"}:
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                raise ToolError("Value must be an integer.")
+
+        if kind in {"boolean", "bool"}:
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, str):
+                lowered = value.strip().lower()
+                if lowered in {"true", "1", "yes"}:
+                    return True
+                if lowered in {"false", "0", "no"}:
+                    return False
+            if isinstance(value, (int, float)):
+                if value in {0, 0.0}:
+                    return False
+                if value in {1, 1.0}:
+                    return True
+            raise ToolError("Value must be boolean (true/false).")
+
+        if value is None:
+            raise ToolError("Value cannot be null.")
+        return str(value)
 
     def _create_stt(self, config: Optional[dict[str, Any]]) -> Any:
         """Create STT provider from configuration."""

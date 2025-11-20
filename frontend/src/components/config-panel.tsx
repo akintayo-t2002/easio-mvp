@@ -1,34 +1,24 @@
-import { X, Edit2 } from 'lucide-react';
-import { Button } from './ui/button';
-import type { Agent, Path } from '../types/workflow';
-import React from 'react';
+import { X, Edit2 } from "lucide-react"
+import { Button } from "./ui/button"
+import type { Agent, Path } from "../types/workflow"
 
 interface ConfigPanelProps {
-  agent: Agent;
-  onEditAgent: () => void;
-  onAddPath: () => void;
-  onDeletePath: (pathId: string | number) => void;
-  paths: Path[];
-  onClose: () => void;
+  agent: Agent
+  onEditAgent: () => void
+  onAddPath: () => void
+  onEditPath: (path: Path) => void
+  onDeletePath: (pathId: string | number) => void
+  paths: Path[]
+  onClose: () => void
 }
 
-const ConfigPanel: React.FC<ConfigPanelProps> = ({
-  agent,
-  onEditAgent,
-  onAddPath,
-  onDeletePath,
-  paths,
-  onClose,
-}) => {
+export default function ConfigPanel({ agent, onEditAgent, onAddPath, onEditPath, onDeletePath, paths, onClose }: ConfigPanelProps) {
   return (
     <div className="w-96 bg-background border-l border-border flex flex-col overflow-hidden">
       {/* Header */}
       <div className="h-16 border-b border-border flex items-center justify-between px-6">
         <h2 className="font-semibold text-text-primary">Agent Configuration</h2>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-background-secondary rounded transition-colors"
-        >
+        <button onClick={onClose} className="p-1 hover:bg-background-secondary rounded transition-colors">
           <X className="w-5 h-5 text-text-secondary" />
         </button>
       </div>
@@ -44,13 +34,8 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
         {/* Paths Section */}
         <div className="py-4 border-b border-border">
           <div className="flex items-center justify-between mb-3">
-            <label className="text-xs font-semibold text-text-secondary uppercase">
-              Paths ({paths.length})
-            </label>
-            <button
-              onClick={onAddPath}
-              className="text-text-secondary hover:text-text-primary text-sm font-semibold"
-            >
+            <label className="text-xs font-semibold text-text-secondary uppercase">Paths ({paths.length})</label>
+            <button onClick={onAddPath} className="text-text-secondary hover:text-text-primary text-sm font-semibold">
               +
             </button>
           </div>
@@ -62,7 +47,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
               paths.map((path) => (
                 <div
                   key={path.id}
-                  className="h-10 flex items-center gap-3 px-3 hover:bg-background-secondary rounded transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 rounded hover:bg-background-secondary transition-colors"
                 >
                   <button
                     type="button"
@@ -72,10 +57,23 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
                   >
                     &minus;
                   </button>
-                  <span className="text-sm text-text-primary truncate">
-                    {path.name}
-                    {path.hideEdge ? ' (hidden)' : ''}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-text-primary truncate">
+                      {path.name}
+                      {path.hideEdge ? " (hidden)" : ""}
+                    </p>
+                    {path.description && (
+                      <p className="text-xs text-text-tertiary truncate">{path.description}</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onEditPath(path)}
+                    aria-label={`Edit path ${path.name}`}
+                    className="flex h-6 w-6 items-center justify-center rounded-full border border-border text-text-secondary hover:text-text-primary"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
                 </div>
               ))
             )}
@@ -85,16 +83,11 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
 
       {/* Footer - Edit Agent Button */}
       <div className="h-16 border-t border-border flex items-center px-6">
-        <Button
-          onClick={onEditAgent}
-          className="w-full bg-button-primary-bg text-button-primary-text hover:opacity-90"
-        >
+        <Button onClick={onEditAgent} className="w-full bg-button-primary-bg text-button-primary-text hover:opacity-90">
           <Edit2 className="w-4 h-4 mr-2" />
           Edit Agent
         </Button>
       </div>
     </div>
-  );
-};
-
-export default ConfigPanel;
+  )
+}

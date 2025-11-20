@@ -14,11 +14,13 @@ from ..schemas import (
     AgentNodeResponse,
     AgentPathCreateRequest,
     AgentPathResponse,
+    AgentPathUpdateRequest,
     AgentToolCreateRequest,
     AgentToolUpdateRequest,
     AgentToolResponse,
     PathVariableCreateRequest,
     PathVariableResponse,
+    PathVariableUpdateRequest,
     WorkflowCreateRequest,
     WorkflowResponse,
     WorkflowSummaryResponse,
@@ -492,6 +494,44 @@ class SupabaseWorkflowRepository:
         )
         return [AgentPathResponse(**p) for p in result.data]
 
+    async def update_path(
+        self, path_id: UUID, payload: AgentPathUpdateRequest
+    ) -> Optional[AgentPathResponse]:
+        """Update path metadata."""
+        update_data: dict[str, Any] = {}
+        if payload.to_agent_id is not None:
+            update_data["to_agent_id"] = str(payload.to_agent_id)
+        if payload.name is not None:
+            update_data["name"] = payload.name
+        if payload.description is not None:
+            update_data["description"] = payload.description
+        if payload.guard_condition is not None:
+            update_data["guard_condition"] = payload.guard_condition
+        if payload.metadata is not None:
+            update_data["metadata"] = payload.metadata
+
+        if not update_data:
+            result = (
+                self.client.table("agent_path")
+                .select("*")
+                .eq("id", str(path_id))
+                .limit(1)
+                .execute()
+            )
+            if not result.data:
+                return None
+            return AgentPathResponse(**result.data[0])
+
+        result = (
+            self.client.table("agent_path")
+            .update(update_data)
+            .eq("id", str(path_id))
+            .execute()
+        )
+        if not result.data:
+            return None
+        return AgentPathResponse(**result.data[0])
+
     async def delete_path(self, path_id: UUID) -> bool:
         """Delete a path."""
         result = self.client.table("agent_path").delete().eq("id", str(path_id)).execute()
@@ -508,7 +548,7 @@ class SupabaseWorkflowRepository:
             "path_id": str(path_id),
             "name": payload.name,
             "description": payload.description,
-            "is_required": payload.is_required,
+            "is_required": True,
             "data_type": payload.data_type,
         }
 
@@ -524,6 +564,50 @@ class SupabaseWorkflowRepository:
             .execute()
         )
         return [PathVariableResponse(**v) for v in result.data]
+
+    async def update_path_variable(
+        self, variable_id: UUID, payload: PathVariableUpdateRequest
+    ) -> Optional[PathVariableResponse]:
+        """Update a path variable."""
+        update_data: dict[str, Any] = {}
+        if payload.name is not None:
+            update_data["name"] = payload.name
+        if payload.description is not None:
+            update_data["description"] = payload.description
+        if payload.data_type is not None:
+            update_data["data_type"] = payload.data_type
+
+        if not update_data:
+            result = (
+                self.client.table("path_variable")
+                .select("*")
+                .eq("id", str(variable_id))
+                .limit(1)
+                .execute()
+            )
+            if not result.data:
+                return None
+            return PathVariableResponse(**result.data[0])
+
+        result = (
+            self.client.table("path_variable")
+            .update(update_data)
+            .eq("id", str(variable_id))
+            .execute()
+        )
+        if not result.data:
+            return None
+        return PathVariableResponse(**result.data[0])
+
+    async def delete_path_variable(self, variable_id: UUID) -> bool:
+        """Delete a path variable."""
+        result = (
+            self.client.table("path_variable")
+            .delete()
+            .eq("id", str(variable_id))
+            .execute()
+        )
+        return len(result.data) > 0
 
 
 

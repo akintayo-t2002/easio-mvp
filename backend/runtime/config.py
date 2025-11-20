@@ -29,11 +29,10 @@ class RuntimeToolParameterConfig:
 
 @dataclass
 class PathVariableConfig:
-    """Configuration for a required variable on a path."""
+    """Configuration for a variable that must be collected before transfer."""
 
     name: str
     description: Optional[str]
-    is_required: bool
     data_type: str
 
 

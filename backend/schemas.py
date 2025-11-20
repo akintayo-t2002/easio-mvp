@@ -124,6 +124,14 @@ class AgentPathCreateRequest(BaseModel):
     metadata: Optional[dict[str, Any]] = None
 
 
+class AgentPathUpdateRequest(BaseModel):
+    to_agent_id: Optional[UUID] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    guard_condition: Optional[str] = None
+    metadata: Optional[dict[str, Any]] = None
+
+
 class AgentPathResponse(BaseModel):
     id: UUID
     from_agent_id: UUID
@@ -141,8 +149,13 @@ class AgentPathResponse(BaseModel):
 class PathVariableCreateRequest(BaseModel):
     name: str
     description: Optional[str] = None
-    is_required: bool = True
     data_type: str = "string"
+
+
+class PathVariableUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    data_type: Optional[str] = None
 
 
 class PathVariableResponse(BaseModel):

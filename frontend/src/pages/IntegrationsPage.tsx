@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react"
-import { Search } from "lucide-react"
+import { Search, Check } from "lucide-react"
 import { FaGoogle, FaSalesforce, FaSlack } from "react-icons/fa"
 import { SiZendesk, SiAirtable, SiGooglesheets } from "react-icons/si"
 import type { IconType } from "react-icons"
 import { useIntegrationStatus } from "../hooks/useIntegrationStatus"
 import { disconnectIntegration } from "../lib/api"
 import { buildIntegrationAuthorizeUrls } from "../lib/utils"
-import { Card } from "../components/ui/card"
-import { Badge } from "../components/ui/badge"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { IntegrationCardSkeleton } from "../components/integrations/IntegrationCardSkeleton"
+import { MainLayout } from "@/components/layout/MainLayout"
 
 interface Integration {
   id: string
@@ -172,109 +173,96 @@ export default function IntegrationsPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-background">
-      {/* Header */}
-      <div className="border-b border-border bg-background px-8 py-6">
-        <h1 className="text-2xl font-semibold text-text-primary mb-2">Integrations</h1>
-
-        {/* Search Bar */}
-        <div className="relative mt-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
-          <input
-            type="text"
-            placeholder="Search integrations....."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-background text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent"
-          />
-        </div>
+    <MainLayout 
+      title="Integrations" 
+      subtitle="Connect your agents to the outside world."
+    >
+      <div className="mb-8 relative max-w-md">
+         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+         <input
+           type="text"
+           placeholder="Search integrations..."
+           value={searchQuery}
+           onChange={(e) => setSearchQuery(e.target.value)}
+           className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+         />
       </div>
 
-      {/* Integration Grid */}
-      <div className="flex-1 overflow-y-auto p-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredIntegrations.map((integration) => {
-            const Icon = integration.icon
-            const isAirtable = integration.id === "airtable"
-            const isGmail = integration.id === "gmail"
-            const integrationStatus = isAirtable ? airtableStatus : isGmail ? gmailStatus : null
-            const isComingSoon = integration.status === "coming-soon"
-            const isLoadingStatus = Boolean(integrationStatus?.isLoading)
-            const hasStatus = Boolean(integrationStatus?.status)
-            const showSkeleton = !isComingSoon && isLoadingStatus && !hasStatus
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredIntegrations.map((integration) => {
+          const Icon = integration.icon
+          const isAirtable = integration.id === "airtable"
+          const isGmail = integration.id === "gmail"
+          const integrationStatus = isAirtable ? airtableStatus : isGmail ? gmailStatus : null
+          const isComingSoon = integration.status === "coming-soon"
+          const isLoadingStatus = Boolean(integrationStatus?.isLoading)
+          const hasStatus = Boolean(integrationStatus?.status)
+          const showSkeleton = !isComingSoon && isLoadingStatus && !hasStatus
 
-            if (showSkeleton) {
-              return <IntegrationCardSkeleton key={integration.id} />
-            }
+          if (showSkeleton) {
+            return <IntegrationCardSkeleton key={integration.id} />
+          }
 
-            const isConnected = integrationStatus ? Boolean(integrationStatus.status?.connected) : false
-            const isBusy = isAirtable
-              ? airtableStatus.isLoading || airtableActionPending
-              : isGmail
-                ? gmailStatus.isLoading || gmailActionPending
-                : false
-            const errorMessage = isAirtable
-              ? airtableActionError
-              : isGmail
-                ? gmailActionError
-                : null
-            const connectedSubtitle =
-              isGmail && isConnected ? gmailStatus.status?.email ?? gmailConnectedEmail : null
+          const isConnected = integrationStatus ? Boolean(integrationStatus.status?.connected) : false
+          const isBusy = isAirtable
+            ? airtableStatus.isLoading || airtableActionPending
+            : isGmail
+              ? gmailStatus.isLoading || gmailActionPending
+              : false
+          const errorMessage = isAirtable
+            ? airtableActionError
+            : isGmail
+              ? gmailActionError
+              : null
+          const connectedSubtitle =
+            isGmail && isConnected ? gmailStatus.status?.email ?? gmailConnectedEmail : null
 
-            return (
-              <Card
-                key={integration.id}
-                className="p-6 hover:border-accent transition-colors flex flex-col gap-4"
-              >
-                <div className="flex items-start justify-between">
-                  <div className={`w-10 h-10 flex items-center justify-center ${integration.iconColor}`}>
-                    <Icon className="w-8 h-8" />
+          return (
+            <div key={integration.id} className="rounded-lg border border-border bg-card text-card-foreground shadow-sm p-6 flex flex-col h-full bg-white dark:bg-card hover:shadow-md transition-all">
+               {/* Header */}
+               <div className="flex justify-between items-start mb-4">
+                  <div className={`w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-xl ${integration.iconColor}`}>
+                     <Icon />
                   </div>
-                  {isComingSoon ? (
-                    <Badge variant="outline" className="text-[11px] uppercase tracking-wide">
-                      Coming Soon
+                  {isConnected ? (
+                    <Badge variant="default" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 hover:bg-green-500/20 shadow-none">
+                       <Check size={12} className="mr-1" /> Connected
                     </Badge>
                   ) : (
-                    <button
-                      onClick={() => void handleToggle(integration.id)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        isConnected ? "bg-green-500" : "bg-gray-300"
-                      }`}
-                      aria-label={`Toggle ${integration.name} connection`}
-                      disabled={isBusy}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          isConnected ? "translate-x-6" : "translate-x-1"
-                        }`}
-                      />
-                    </button>
+                    <Badge variant="outline" className="text-muted-foreground bg-secondary/50 border-border">
+                       {isComingSoon ? "Coming Soon" : "Not Connected"}
+                    </Badge>
                   )}
-                </div>
+               </div>
+               
+               {/* Content */}
+               <div className="mb-4 flex-1">
+                  <h3 className="font-heading font-semibold text-base mb-1">{integration.name}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{integration.description}</p>
+                  {connectedSubtitle && <p className="mt-2 text-xs text-muted-foreground">Connected as {connectedSubtitle}</p>}
+                  {errorMessage && <p className="mt-2 text-sm text-destructive">{errorMessage}</p>}
+               </div>
 
-                <div>
-                  <h3 className="text-base font-semibold text-text-primary mb-2">{integration.name}</h3>
-                  <p className="text-sm text-text-secondary">{integration.description}</p>
-                  {connectedSubtitle ? (
-                    <p className="mt-2 text-xs text-text-secondary">Connected as {connectedSubtitle}</p>
-                  ) : null}
-                  {errorMessage ? (
-                    <p className="mt-2 text-sm text-error">{errorMessage}</p>
-                  ) : null}
+               {/* Footer / Action */}
+               <div className="pt-4 mt-auto border-t border-border/50">
                   {isComingSoon ? (
-                    <p className="mt-2 text-xs text-text-tertiary">
-                      This integration is on our roadmap. Stay tuned!
-                    </p>
-                  ) : null}
-                </div>
-              </Card>
-            )
-          })}
-        </div>
+                     <Button variant="outline" className="w-full shadow-none" disabled>Coming Soon</Button>
+                  ) : (
+                     <Button 
+                       variant={isConnected ? "outline" : "default"} 
+                       className={`w-full shadow-none ${!isConnected && "bg-primary text-primary-foreground hover:bg-primary/90"}`}
+                       size="sm"
+                       onClick={() => void handleToggle(integration.id)}
+                       disabled={isBusy}
+                     >
+                       {isConnected ? "Disconnect" : "Connect"}
+                     </Button>
+                  )}
+               </div>
+            </div>
+          )
+        })}
       </div>
-    </div>
+    </MainLayout>
   )
 }
-
-
-

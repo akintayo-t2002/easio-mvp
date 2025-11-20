@@ -114,7 +114,6 @@ class WorkflowLoader:
                     PathVariableConfig(
                         name=v.name,
                         description=v.description,
-                        is_required=v.is_required,
                         data_type=v.data_type,
                     )
                     for v in var_rows

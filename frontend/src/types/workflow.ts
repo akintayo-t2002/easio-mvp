@@ -70,6 +70,8 @@ export interface AgentToolResponse {
   created_at: string
 }
 
+export type PathVariableDataType = "string" | "number" | "integer" | "boolean"
+
 export interface AgentPathResponse {
   id: string
   from_agent_id: string
@@ -117,8 +119,7 @@ export interface PathVariable {
   id: string
   name: string
   description?: string | null
-  required: boolean
-  dataType: string
+  dataType: PathVariableDataType
 }
 
 export interface Path {
@@ -131,6 +132,7 @@ export interface Path {
   transferMessage?: string
   variables: PathVariable[]
   hideEdge?: boolean
+  metadata?: Record<string, unknown> | null
 }
 
 export interface RuntimeParameter {

@@ -20,12 +20,14 @@ from .schemas import (
     AgentNodeResponse,
     AgentPathCreateRequest,
     AgentPathResponse,
+    AgentPathUpdateRequest,
     AgentToolCreateRequest,
     AgentToolUpdateRequest,
     AgentToolResponse,
     IntegrationStatusResponse,
     PathVariableCreateRequest,
     PathVariableResponse,
+    PathVariableUpdateRequest,
     WorkflowConfigResponse,
     WorkflowCreateRequest,
     WorkflowResponse,
@@ -458,6 +460,22 @@ async def delete_path(
         )
 
 
+@router.patch("/paths/{path_id}", response_model=AgentPathResponse)
+async def update_path(
+    path_id: UUID,
+    payload: AgentPathUpdateRequest,
+    repo: SupabaseWorkflowRepository = Depends(get_repository),
+) -> AgentPathResponse:
+    """Update a path's metadata."""
+    path = await repo.update_path(path_id, payload)
+    if not path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Path {path_id} not found",
+        )
+    return path
+
+
 # ==================== Path Variable Endpoints ====================
 
 
@@ -482,6 +500,38 @@ async def list_path_variables(
 ) -> list[PathVariableResponse]:
     """List all variables for a path."""
     return await repo.list_path_variables(path_id)
+
+
+@router.patch(
+    "/path-variables/{variable_id}", response_model=PathVariableResponse
+)
+async def update_path_variable(
+    variable_id: UUID,
+    payload: PathVariableUpdateRequest,
+    repo: SupabaseWorkflowRepository = Depends(get_repository),
+) -> PathVariableResponse:
+    """Update a path variable."""
+    variable = await repo.update_path_variable(variable_id, payload)
+    if not variable:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Path variable {variable_id} not found",
+        )
+    return variable
+
+
+@router.delete("/path-variables/{variable_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_path_variable(
+    variable_id: UUID,
+    repo: SupabaseWorkflowRepository = Depends(get_repository),
+) -> None:
+    """Delete a path variable."""
+    success = await repo.delete_path_variable(variable_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Path variable {variable_id} not found",
+        )
 
 
 # ==================== Complete Configuration Endpoint ====================

@@ -4,6 +4,11 @@ const config = {
   darkMode: ["class"],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["Inter", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
+        heading: ["Poppins", "sans-serif"],
+      },
       colors: {
         // Standard Shadcn colors with HSL support
         background: "hsl(var(--background))",
@@ -42,6 +47,16 @@ const config = {
         success: "var(--color-success, #10b981)",
         warning: "var(--color-warning, #f59e0b)",
         error: "var(--color-error, #ef4444)",
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar-background))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          primary: "hsl(var(--sidebar-primary))",
+          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
+          accent: "hsl(var(--sidebar-accent))",
+          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
+          border: "hsl(var(--sidebar-border))",
+          ring: "hsl(var(--sidebar-ring))",
+        },
         
         // V0 Custom colors
         "canvas-bg": "var(--color-canvas-bg)",

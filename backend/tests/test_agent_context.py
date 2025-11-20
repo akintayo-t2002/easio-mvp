@@ -1,10 +1,13 @@
 from types import SimpleNamespace
+from uuid import uuid4
 
 import asyncio
 
 import pytest
 from livekit.agents import ChatContext
+from livekit.agents.llm.tool_context import ToolError
 
+from backend.runtime.config import PathConfig, PathVariableConfig
 from backend.runtime.factory import BaseConfigurableAgent, UserData
 
 
@@ -92,3 +95,31 @@ def test_transfer_to_missing_agent_raises() -> None:
             await agent._transfer_to_agent("unknown", context)
 
     asyncio.run(_run())
+
+
+def test_prepare_handoff_summary_requires_variables() -> None:
+    agent = _make_agent()
+    path = PathConfig(
+        id=uuid4(),
+        target_agent_id=uuid4(),
+        name="Auth",
+        description=None,
+        guard_condition=None,
+        required_variables=[
+            PathVariableConfig(
+                name="memberEmail",
+                description="Patient email",
+                data_type="string",
+            )
+        ],
+        metadata=None,
+    )
+
+    with pytest.raises(ToolError):
+        agent._prepare_handoff_summary(path)
+
+    agent.set_path_variable(str(path.id), "memberEmail", "user@example.com")
+    summary = agent._prepare_handoff_summary(path)
+
+    assert summary
+    assert summary["variables"]["memberEmail"] == "user@example.com"
